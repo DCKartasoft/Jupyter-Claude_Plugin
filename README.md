@@ -13,9 +13,9 @@ A JupyterLab extension enabling collaborative development between users and Clau
 - **Explain a cell** — Claude documents an existing cell with a markdown explanation
 - **Fix last error** — Claude sees the error from your last cell run and offers a corrected version
 - **Runtime tier selector** — switch between opus/sonnet/haiku in the chat panel for quality/speed tradeoffs (Bedrock only)
-- **MCP server management** — enable/disable individual MCP servers from `~/.claude.json` per session (defaults to Jupyter only for faster startup)
-- **Notebook toolbar buttons** — five icons in the toolbar for quick access to all v1 commands plus MCP server selector
-- **Visual feedback** — animated "Claude is thinking…" spinner while processing
+- **MCP server management** — enable/disable individual MCP servers from `~/.claude.json` per session via dialog command (defaults to Jupyter only for faster startup)
+- **Notebook toolbar buttons** — all five commands as icons in toolbar: Open Chat, Generate cell, Explain cell, Fix last error, and MCP server selector
+- **Visual feedback** — animated "Claude is thinking…" spinner while processing; disabled tier selector during requests
 
 ## Requirements
 
@@ -118,6 +118,7 @@ jupyter labextension list
 
 ## Documentation
 
+- **[docs/USER_GUIDE.md](docs/USER_GUIDE.md) — install & operation guide (start here)**
 - [docs/PLAN.md](docs/PLAN.md) — step-by-step implementation roadmap
 - [docs/DECISIONS.md](docs/DECISIONS.md) — decision log and rationale
 - [docs/Architecture.md](docs/Architecture.md) — component diagram and data flow

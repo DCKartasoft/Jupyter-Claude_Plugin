@@ -55,12 +55,11 @@ cd /Users/DC-KS/Dev/Jupyter-Claude_Plugin
 uv venv                      # creates .venv/ with the interpreter uv picks
 source .venv/bin/activate
 
-# Scaffold with copier via uvx (one-shot tool run — no global install)
-uvx --from "copier" --with "copier-templates-extensions" \
-  copier copy --trust https://github.com/jupyterlab/extension-template . --overwrite
+# Scaffold with copier via uvx (one-shot tool run — no global install; jinja2-time needed for TimeExtension)
+uvx --with jinja2-time copier copy --trust https://github.com/jupyterlab/extension-template . --overwrite
 ```
 
-Choose `kind: frontend-and-server`, package name `jupyter_claude`, author metadata, license. This produces the standard layout: `pyproject.toml`, `package.json`, `src/index.ts`, `jupyter_claude/__init__.py`, `jupyter_claude/handlers.py`, `schema/plugin.json`, `jupyter-config/`, `install.json`. Delete the stub `Jupyter-Claude-Plug.py`.
+Choose `kind: frontend-and-server`, labextension name `@dckartasoft/jupyter-claude`, package name `jupyter_claude`, author metadata, license. This produces the standard layout: `pyproject.toml`, `package.json`, `src/index.ts`, `jupyter_claude/__init__.py`, `jupyter_claude/handlers.py`, `schema/plugin.json`, `jupyter-config/`, `install.json`.
 
 Install dev deps (uv-native, keeps `pyproject.toml` as the source of truth):
 
@@ -69,7 +68,7 @@ jlpm install                                                    # frontend deps
 uv pip install -e ".[dev,test]"                                 # editable install of the extension
 uv pip install jupyter-mcp-server jupyter-collaboration claude-agent-sdk
 
-# Link the labextension so Jupyter serves in-tree builds (required for dev)
+# Link the labextension so Jupyter serves in-tree builds (required for dev; replaces .venv copy with symlink)
 jupyter labextension develop . --overwrite
 jupyter server extension enable jupyter_claude
 ```
@@ -146,23 +145,28 @@ Only if we want token-by-token fill-in of a cell being generated: add `@tool("st
 4. **MCP tool visibility** — inspect the first `SystemMessage(subtype="init")` from the SDK; `message.data["mcp_servers"]["jupyter"].tools` must include the cell R/W tools.
 5. **Permission gating** — verify `permission_prompt_tool_name="jclaude_approve"` fires a modal in the panel before Claude writes/executes a cell for the first time in a session.
 
+## Step 6 — User guide and polish (optional)
+
+For new users, add **docs/USER_GUIDE.md** — comprehensive install & operation reference covering requirements, dev setup, both backend paths (Anthropic direct + AWS Bedrock SSO), launch procedure, all five v1 commands (chat, generate, explain, fix, MCP servers), per-tier model reference table, troubleshooting (including common gotchas: stale `page_config.json` disabled/locked lists, SSO expiry, missing kernel), and uninstall. Cross-link from `README.md`.
+
 ## Critical files to touch
 
 | File | Purpose |
 |---|---|
-| [jupyter_claude/config.py] | Backend + model + AWS region + MCP traitlets |
-| [jupyter_claude/agent.py] | Build `ClaudeAgentOptions`, filter MCP servers by enabled list |
+| [jupyter_claude/config.py] | Backend + model + AWS region + AWS profile + per-tier model IDs + enabled MCP servers traitlets |
+| [jupyter_claude/agent.py] | Build `ClaudeAgentOptions`, filter MCP servers by enabled list, tier overrides, SSO profile forwarding |
 | [jupyter_claude/mcp_discovery.py] | List user's registered MCP servers from `~/.claude.json` |
-| [jupyter_claude/handlers.py] | WS chat handler, REST MCP-servers endpoints, tier switching |
+| [jupyter_claude/handlers.py] | WS chat handler, REST MCP-servers endpoints, tier switching, per-connection client lifecycle |
 | [jupyter_claude/__init__.py] | Extension entrypoints |
-| [src/index.ts] | Plugin activate, tracker + shell wiring |
+| [src/index.ts] | Plugin activate, tracker + shell wiring, layout restorer |
 | [src/commands.ts] | Five v1 commands + cell-error capture |
-| [src/panel.tsx] | React chat panel with tier selector + spinner |
+| [src/panel.tsx] | React chat panel with tier selector + spinner + input textarea |
 | [src/mcpDialog.tsx] | MCP server selector dialog |
-| [src/ws.ts] | WS client with typed messages |
-| [src/icons.ts] | Custom `claudeIcon` SVG |
-| [schema/plugin.json] | Toolbar registration + settings schema |
+| [src/ws.ts] | WS client with typed messages and auto-reconnect |
+| [src/icons.ts] | Custom `claudeIcon` SVG (blue spark, `#4361ee`) |
+| [schema/plugin.json] | Toolbar registration + settings schema + per-tier model traits |
 | [pyproject.toml] | Add `claude-agent-sdk`, `jupyter-mcp-server`, `jupyter-collaboration` |
+| [docs/USER_GUIDE.md] | User-facing operation manual (install, launch, commands, troubleshooting) |
 
 ## Out of scope for v1
 
