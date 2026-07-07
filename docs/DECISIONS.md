@@ -69,3 +69,28 @@ Rationale: user's dev environment is brew + uv. `pipx` isn't installed and `uvx`
 Category: process
 Haiku 4.5 agent runs every 10 minutes (durable, persists across sessions) reading `docs/DECISIONS.md` and updating `docs/PLAN.md`, `README.md`, `docs/CHANGELOG.md`, and `docs/Architecture.md` to reflect the current state.
 Rationale: user wants documentation to stay in sync automatically without manual intervention. Haiku is cheap and fast enough for this maintenance work.
+
+## [2026-07-07 11:40] Initial commit landed (6e4db50)
+Category: process
+Root commit `6e4db50` on `main` — 11 files, 335 insertions. Includes plan, decisions, doc-keeper cron config, uv init boilerplate, and stub. No Co-Authored-By trailer (user preference). `.claude/scheduled_tasks.lock` and `.claude/settings.local.json` excluded via `.gitignore`.
+Rationale: capture baseline before Step 1 scaffold overwrites the working tree with copier output.
+
+## [2026-07-07 11:57] JupyterLab extension scaffold generated
+Category: tooling
+Ran `uvx --with jinja2-time copier copy --trust https://github.com/jupyterlab/extension-template . --overwrite` (kind=frontend-and-server, has_settings=y, test=y, has_ai_rules=n). Template needed `jinja2-time` for `TimeExtension` — silent failure without it. Scaffold produced `jupyter_claude/` (Python), `src/` (TS), `schema/`, `install.json`, `package.json`, `pyproject.toml` (hatch + hatch-jupyter-builder), `.github/workflows/`, `ui-tests/` (Playwright/galata), `CONTRIBUTING.md`, `RELEASE.md`, `LICENSE` (BSD-3-Clause).
+Rationale: JupyterLab's official template gives us build tooling, CI, and structure we'd otherwise hand-roll.
+
+## [2026-07-07 12:00] Corrected labextension_name
+Category: tooling
+Copier picked `myextension@dc-ks/jupyter-claude` from my prompt answer `@dc-ks/jupyter-claude` — malformed (mixed case, missing scope prefix). Replaced with `@dckartasoft/jupyter-claude` (matches GitHub org `DCKartasoft`, all lowercase per NPM rules) across `package.json`, `pyproject.toml`, `schema/plugin.json`, `.copier-answers.yml`, `ui-tests/package.json`. `schema/plugin.json` title now reads "Jupyter Claude" for the human-facing Settings Editor entry.
+Rationale: labextension name is the NPM package name; must be valid or `jlpm install` and Jupyter's labextension paths break.
+
+## [2026-07-07 12:00] Changelog consolidation
+Category: process
+Deleted `docs/CHANGELOG.md`; root `CHANGELOG.md` (from copier, with `<START NEW CHANGELOG ENTRY>` markers used by `jupyter-releaser`) is now the single changelog. Doc-keeper cron retargeted (job `18c60a70` replaces `63492d24`) to write inside those markers.
+Rationale: JupyterLab convention. Two changelogs is confusing; `jupyter-releaser` won't find our decisions if they're in `docs/`.
+
+## [2026-07-07 12:00] Stubs removed
+Category: cleanup
+Deleted `main.py` (uv init boilerplate) and `Jupyter-Claude-Plug.py` (empty Day-1 stub). Both superseded by the copier scaffold.
+Rationale: dead files.

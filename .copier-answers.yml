@@ -1,0 +1,16 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v4.6.2
+_src_path: https://github.com/jupyterlab/extension-template
+advanced: false
+author_email: david.cleminson@kartasoft.com
+author_name: David Cleminson
+has_ai_rules: false
+has_binder: false
+has_settings: true
+kind: frontend-and-server
+labextension_name: '@dckartasoft/jupyter-claude'
+project_short_description: Collaborate with Claude on Jupyter notebook code and documentation
+python_name: jupyter_claude
+repository: https://github.com/DCKartasoft/Jupyter-Claude_Plugin
+test: true
+

@@ -1,0 +1,8 @@
+{
+  "jupyter.lab.shortcuts": [],
+  "title": "Jupyter Claude",
+  "description": "Settings for the Jupyter Claude collaboration extension.",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
