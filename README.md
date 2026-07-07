@@ -55,7 +55,31 @@ claude mcp add --scope user jupyter --transport http http://localhost:8888/mcp
 
 ## Backend
 
-Supports both **Anthropic direct** (via `ANTHROPIC_API_KEY`) and **AWS Bedrock** (via `CLAUDE_CODE_USE_BEDROCK=1` + AWS credentials, and an inference-profile model ID such as `us.anthropic.claude-opus-4-8`). Backend selection is env-var driven; see [docs/PLAN.md Step 2](docs/PLAN.md#step-2--server-extension-python) for full configuration.
+The extension supports two Claude backends. Pick one in the JupyterLab Settings Editor (or via `jupyter_server_config.py`) — everything else is derived from that choice.
+
+### Anthropic direct
+
+Set `ANTHROPIC_API_KEY` in the environment before launching Jupyter. The extension will use the `model` trait (default `claude-opus-4-8`).
+
+### AWS Bedrock via shared SSO
+
+Configuration lives in the extension traits (not shell env — the extension writes the right vars into the Claude Agent SDK subprocess itself):
+
+- `backend = "bedrock"`
+- `aws_region = "us-east-1"` (or your region)
+- `aws_profile = "<your profile>"` — a named profile from `~/.aws/config`
+- `default_opus_model`, `default_sonnet_model`, `default_haiku_model` — inference-profile IDs (defaults are set for the current Bedrock lineup: `us.anthropic.claude-opus-4-7`, `us.anthropic.claude-sonnet-4-6`, `us.anthropic.claude-haiku-4-5-20251001-v1:0`)
+
+Refresh your SSO session and start Jupyter with `aws-vault` so the subprocess inherits temporary STS credentials without leaking them to disk:
+
+```bash
+aws sso login --profile <your profile>              # once per session
+aws-vault exec <your profile> -- jupyter lab
+```
+
+If you prefer not to use `aws-vault`, `AWS_PROFILE=<name> AWS_REGION=<region> jupyter lab` also works — the extension forwards those to the SDK.
+
+See [docs/PLAN.md](docs/PLAN.md) for design details.
 
 ## Architecture
 

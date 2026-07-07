@@ -119,21 +119,17 @@ Prereq: Node ≥ 20 (`brew install node`) — the copier template's build (`jlpm
   - Register commands (see `commands.ts`).
   - Create a `ReactWidget` chat panel, `app.shell.add(widget, 'right', { rank: 900 })`.
   - Attach `NotebookActions.executed.connect(onCellExecuted)` — capture `{success:false, error}` and buffer the last error per notebook for the "Fix last error" command.
-- `src/commands.ts` — four commands, each posts a WS message with the right prompt template:
+- `src/commands.ts` — four commands, each posts a WS message with the right prompt template and instructs Claude to use `mcp__jupyter__*` tools:
   - `jclaude:chat` (open panel; palette + right sidebar button)
-  - `jclaude:generate-from-prompt` (opens an inline input above the notebook, sends `Generate a cell that: <text>`; on `TextBlock` completion inserts a new cell via `NotebookActions.insertBelow` populated with parsed code)
-  - `jclaude:explain-cell` (selector `.jp-Notebook .jp-Cell`; reads `cell.model.sharedModel.getSource()`, sends `Explain this cell in a markdown doc:`, inserts markdown cell above)
-  - `jclaude:fix-last-error` (uses buffered error + cell source; inserts fixed code cell below)
+  - `jclaude:generate-cell` (sends `Generate a cell that: <text>` with instruction to call `mcp__jupyter__insert_execute_code_cell`)
+  - `jclaude:explain-cell` (selector `.jp-Notebook .jp-Cell`; reads `cell.model.sharedModel.getSource()`, sends `Explain this cell in a markdown doc:` with instruction to call `mcp__jupyter__insert_cell` above)
+  - `jclaude:fix-last-error` (uses buffered error + cell source; instructs Claude to use `mcp__jupyter__insert_cell` or `insert_execute_code_cell` below the error)
   - Register on cell toolbar via `schema/plugin.json` `"jupyter.lab.toolbars": { "Cell": [...] }` and on context menu via `app.contextMenu.addItem({ command, selector: '.jp-Notebook .jp-Cell' })`.
 - `src/panel.tsx` — chat UI. Start with a plain scrolling message list + input; wire markdown rendering with `@jupyterlab/rendermime`. Do **not** pull in `@jupyter/chat` for v1 (Yjs shared-doc storage is overkill).
 - `src/ws.ts` — thin wrapper around `new WebSocket(URLExt.join(ServerConnection.makeSettings().wsUrl, 'jclaude/chat'))` with auto-reconnect and typed message events.
 - `schema/plugin.json` — settings schema mirroring `config.py` traits (backend, model, aws_region, system_prompt) so users edit them in Settings Editor.
 
-**Cell-write path:** two options, pick per command:
-- Simple commands (explain, fix, generate) — Claude returns full text via chat; frontend parses fenced code block and calls `NotebookActions.insertBelow` locally. Fast, no MCP round-trip for the write.
-- Agentic flows (later) — Claude calls `mcp__jupyter__insert_cell` directly via the Jupyter MCP server. Frontend just watches Yjs cell updates and renders.
-
-For v1 use the simple path; the MCP write path is available as we grow.
+**Cell-write path:** Claude calls `mcp__jupyter__insert_cell` (or `insert_execute_code_cell`) directly via the Jupyter MCP server for all cell-manipulating commands. Frontend does not parse fenced code blocks; it streams chat and watches the notebook update via MCP. Cleaner separation: Claude sees exact notebook state via `read_notebook` and writes back through the same MCP surface, keeping cell positions and outputs consistent.
 
 ## Step 4 — Optional custom tool for streaming diffs (defer)
 

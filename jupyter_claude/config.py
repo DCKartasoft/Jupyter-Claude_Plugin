@@ -28,6 +28,37 @@ class ClaudeExtensionApp(ExtensionApp):
         help="AWS region for the Bedrock backend. Ignored when backend is `anthropic`.",
     )
 
+    aws_profile = Unicode(
+        "",
+        config=True,
+        help="AWS named profile for the Bedrock backend. When non-empty, "
+        "`AWS_PROFILE` is set in the SDK subprocess env so it picks up shared "
+        "SSO credentials from `~/.aws/config`. Empty means fall back to whatever "
+        "credentials the Jupyter process already has. Ignored when backend is "
+        "`anthropic`.",
+    )
+
+    default_opus_model = Unicode(
+        "us.anthropic.claude-opus-4-7",
+        config=True,
+        help="Bedrock inference-profile ID for the Opus tier. Used only when "
+        "backend is `bedrock`.",
+    )
+
+    default_sonnet_model = Unicode(
+        "us.anthropic.claude-sonnet-4-6",
+        config=True,
+        help="Bedrock inference-profile ID for the Sonnet tier. Used only when "
+        "backend is `bedrock`.",
+    )
+
+    default_haiku_model = Unicode(
+        "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        config=True,
+        help="Bedrock inference-profile ID for the Haiku tier. Used only when "
+        "backend is `bedrock`.",
+    )
+
     system_prompt = Unicode(
         "You are a helpful assistant collaborating with a data scientist inside "
         "a JupyterLab notebook. You can read, write, and execute notebook cells "
@@ -62,12 +93,21 @@ class ClaudeExtensionApp(ExtensionApp):
 
     def initialize_settings(self):
         self.settings["jclaude_config"] = self
-        self.log.info(
-            "jupyter_claude configured: backend=%s model=%s region=%s",
-            self.backend,
-            self.model,
-            self.aws_region if self.backend == "bedrock" else "n/a",
-        )
+        if self.backend == "bedrock":
+            self.log.info(
+                "jupyter_claude configured: backend=bedrock region=%s profile=%s "
+                "opus=%s sonnet=%s haiku=%s",
+                self.aws_region,
+                self.aws_profile or "<from process env>",
+                self.default_opus_model,
+                self.default_sonnet_model,
+                self.default_haiku_model,
+            )
+        else:
+            self.log.info(
+                "jupyter_claude configured: backend=anthropic model=%s",
+                self.model,
+            )
 
     def initialize_handlers(self):
         from .chat_handler import ChatWebSocketHandler

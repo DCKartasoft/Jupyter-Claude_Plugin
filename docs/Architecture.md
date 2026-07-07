@@ -29,6 +29,19 @@ JupyterLab (browser)
 
 ## Backend selection
 
-Backend is env-var driven inside the Agent SDK:
-- `ANTHROPIC_API_KEY` → Anthropic direct
-- `CLAUDE_CODE_USE_BEDROCK=1` + `AWS_REGION` + AWS creds → Bedrock (requires cross-region inference-profile model IDs like `us.anthropic.claude-opus-4-8`)
+Backend is env-var driven inside the Agent SDK at query time:
+- `ANTHROPIC_API_KEY` → Anthropic direct (uses model IDs like `claude-opus-4-8`)
+- `CLAUDE_CODE_USE_BEDROCK=1` + `AWS_REGION` + AWS credentials → AWS Bedrock (requires inference-profile model IDs like `us.anthropic.claude-opus-4-8`)
+
+Configuration is set via `jupyter_server_config.py` or the JupyterLab Settings Editor (schema in `schema/plugin.json`).
+
+## MCP tool usage
+
+Claude reads / writes / executes cells via `mcp__jupyter__*` tools provided by `jupyter-mcp-server`:
+- `read_notebook` — current notebook state
+- `read_cell` — single cell source
+- `insert_cell`, `insert_execute_code_cell` — add new cell (with or without auto-execution)
+- `overwrite_cell_source` — modify existing cell
+- `execute_cell` — run a cell and capture output
+
+Frontend does not parse code blocks; it sends prompts with explicit instructions for Claude to use these tools. Frontend streams chat messages and watches the notebook update via MCP, keeping state consistent.

@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+- Frontend cell-write path: Claude calls `mcp__jupyter__*` tools (insert_cell, insert_execute_code_cell) directly; frontend does not parse code blocks. Cleaner separation of concerns.
+- React 18 pinned to `^18.2.0` for JupyterLab 4 type compatibility; `tsconfig.json` moduleResolution set to `bundler`.
+- Frontend built: React chat panel with message list, WebSocket client with auto-reconnect, four v1 commands (chat, generate, explain, fix), cell toolbar buttons and context menu entries.
+- Server extension built: `ClaudeExtensionApp` with configurable backend/model/region traits, `ClaudeSDKClient` per WS connection, chat handler at `/jupyter-claude/chat`.
 - JupyterLab extension scaffold generated via copier (frontend-and-server, package `@dckartasoft/jupyter-claude`, Python `jupyter_claude`).
 - Fixed malformed `labextension_name` (`myextension@dc-ks/jupyter-claude` → `@dckartasoft/jupyter-claude`) across `package.json`, `pyproject.toml`, `schema/plugin.json`, `.copier-answers.yml`, `ui-tests/package.json`.
 - Root `CHANGELOG.md` is now the single changelog; `docs/CHANGELOG.md` removed.

@@ -9,10 +9,17 @@ def build_options(cfg, jupyter_mcp_url: str, jupyter_token: str) -> ClaudeAgentO
     if cfg.backend == "bedrock":
         env["CLAUDE_CODE_USE_BEDROCK"] = "1"
         env["AWS_REGION"] = cfg.aws_region
-        env["ANTHROPIC_MODEL"] = cfg.model
+        env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = cfg.default_opus_model
+        env["ANTHROPIC_DEFAULT_SONNET_MODEL"] = cfg.default_sonnet_model
+        env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] = cfg.default_haiku_model
+
+        if cfg.aws_profile:
+            env["AWS_PROFILE"] = cfg.aws_profile
+
         for var in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
-                    "AWS_PROFILE", "AWS_BEARER_TOKEN_BEDROCK"):
-            if var in os.environ:
+                    "AWS_PROFILE", "AWS_BEARER_TOKEN_BEDROCK", "AWS_CONFIG_FILE",
+                    "AWS_SHARED_CREDENTIALS_FILE"):
+            if var in os.environ and var not in env:
                 env[var] = os.environ[var]
     else:
         if "ANTHROPIC_API_KEY" in os.environ:

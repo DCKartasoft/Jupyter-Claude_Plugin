@@ -39,6 +39,30 @@
       "title": "AWS region",
       "description": "AWS region for the Bedrock backend. Ignored when backend is `anthropic`."
     },
+    "awsProfile": {
+      "type": "string",
+      "default": "",
+      "title": "AWS profile",
+      "description": "AWS named profile for the Bedrock backend (from ~/.aws/config). Uses shared SSO credentials when set. Empty means fall back to the Jupyter process's environment."
+    },
+    "defaultOpusModel": {
+      "type": "string",
+      "default": "us.anthropic.claude-opus-4-7",
+      "title": "Default Opus model (Bedrock)",
+      "description": "Bedrock inference-profile ID for the Opus tier."
+    },
+    "defaultSonnetModel": {
+      "type": "string",
+      "default": "us.anthropic.claude-sonnet-4-6",
+      "title": "Default Sonnet model (Bedrock)",
+      "description": "Bedrock inference-profile ID for the Sonnet tier."
+    },
+    "defaultHaikuModel": {
+      "type": "string",
+      "default": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "title": "Default Haiku model (Bedrock)",
+      "description": "Bedrock inference-profile ID for the Haiku tier."
+    },
     "systemPrompt": {
       "type": "string",
       "default": "You are a helpful assistant collaborating with a data scientist inside a JupyterLab notebook.",
