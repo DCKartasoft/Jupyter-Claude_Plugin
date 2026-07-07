@@ -124,3 +124,58 @@ Rationale: cleaner separation. Claude sees the exact notebook state via `read_no
 Category: architecture
 User's target environment uses shared AWS SSO with `AWS_PROFILE=<name>` and the Claude Code convention of three tier defaults: `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`. Added four new traits to `ClaudeExtensionApp`: `aws_profile`, `default_opus_model` (default `us.anthropic.claude-opus-4-7`), `default_sonnet_model` (default `us.anthropic.claude-sonnet-4-6`), `default_haiku_model` (default `us.anthropic.claude-haiku-4-5-20251001-v1:0`). `build_options()` in `agent.py` now sets the three tier env vars (not a single `ANTHROPIC_MODEL`) and injects `AWS_PROFILE` from the trait, still forwarding any AWS creds already in the process env (`AWS_CONFIG_FILE`, `AWS_SHARED_CREDENTIALS_FILE` added to the forward list for SSO cache discovery). `schema/plugin.json` mirrors the traits; README documents the `aws-vault exec` launch pattern.
 Rationale: the user's existing shell alias (`AWS_PROFILE=... AWS_REGION=... claude`) is a CLI-specific hack that doesn't survive being run under Jupyter. Making profile + per-tier models first-class traits means users configure once (Settings Editor or `jupyter_server_config.py`), and Jupyter itself can be launched with `aws-vault exec <profile> -- jupyter lab` to inject temporary STS credentials without leaking secrets to disk.
+
+## [2026-07-07 15:17] Labextension linked as symlink via `jupyter labextension develop`
+Category: tooling
+The initial `uv pip install -e ".[dev,test]"` shipped the pre-copier bundle into `.venv/share/jupyter/labextensions/@dckartasoft/jupyter-claude/` and it was never refreshed. All `jlpm build` runs updated the in-tree `jupyter_claude/labextension/` but Jupyter served the stale copy. Diagnosed after the browser showed the old plugin ID `myextension@dc-ks/jupyter-claude` in activation logs. Fix: `jupyter labextension develop . --overwrite` replaces the .venv path with a symlink to the in-tree build. Also had to clear `~/.jupyter/lab/workspaces/*.jupyterlab-workspace` (stale layout with old widget list) and add `ILayoutRestorer` to the plugin so the right-sidebar attachment survives future workspace persistence.
+Rationale: development workflow needs the symlink; without it every source change requires a manual copy or full re-install. Add `jupyter labextension develop` to the README dev-install block.
+
+## [2026-07-07 15:20] `page_config.json` disabled/locked our extension
+Category: tooling
+`.venv/etc/jupyter/labconfig/page_config.json` had `disabledExtensions.dckartasoft-jupyter-claude=true` AND `lockedExtensions.dckartasoft-jupyter-claude=true` — presumably left over from an earlier `jupyter labextension disable` run during the malformed-name era. Result: extension showed as `enabled OK` in `jupyter labextension list` but `activate()` never ran (silently). Cleared both maps.
+Rationale: don't `disable` the extension by NPM name during development — restart with a rebuild instead.
+
+## [2026-07-07 15:40] Icon: `codeIcon` (no `chatIcon` in ui-components)
+Category: architecture
+`ChatPanelWidget.title` needs `.icon` set for the sidebar tab to render. Initially tried `chatIcon` from `@jupyterlab/ui-components` — doesn't exist. Used `codeIcon` (available in `iconimports`).
+Rationale: sidebar tabs without an icon render as a zero-width strip.
+
+## [2026-07-07 15:45] Command dialogs use JupyterLab InputDialog
+Category: architecture
+`window.prompt()` was silently blocked by the browser in the JupyterLab iframe context — Test 2 (`Generate cell`) appeared to do nothing. Also `Fix last error` command never showed in the palette because `isEnabled` checked `lastErrors.has(notebook.id)` but the executed-cell signal keys the notebook differently — the lookup always missed. Fixes: swap `window.prompt` → `InputDialog.getText` (real JupyterLab modal); key `lastErrors` by `tracker.currentWidget?.id` consistently at both write and read; always enable `Fix last error` when a notebook is open (friendly dialog if no error captured yet); added `console.log` when an error is captured for debugging.
+Rationale: needed to be able to test the commands at all; and the fix-last-error id mismatch was blocking every future user, not just first-run.
+
+## [2026-07-07 15:50] Cell-type dropdown for Generate command
+Category: architecture
+`Generate cell with Claude…` now opens a first dialog with a dropdown (`code` / `markdown` / `raw`, default `code`), then a description dialog whose placeholder adapts to the chosen type. Prompt sent to Claude differs by type: code cells → `mcp__jupyter__insert_execute_code_cell`; markdown/raw → `mcp__jupyter__insert_cell` with `cell_type="..."` and an explicit "do not execute" instruction.
+Rationale: user requested. Also more accurate — markdown/raw cells shouldn't go through `insert_execute_code_cell` which auto-runs.
+
+## [2026-07-07 15:53] `main_model_tier` trait for speed/quality tradeoff
+Category: architecture
+Response time on Opus 4.7 felt slow. Added `main_model_tier: Enum(["opus", "sonnet", "haiku"], default="sonnet")` trait. `agent.py` now writes `ANTHROPIC_MODEL` (in addition to the three tier vars) to the selected tier's model ID; `chat_handler.py` sends that resolved model back in the `ready` frame so the panel's "Connected — bedrock / …" line shows what's actually running. Schema entry added. Bedrock only — Anthropic direct still uses the plain `model` trait.
+Rationale: Sonnet 4.6 is a good default for chat/cell generation (2-3× faster than Opus, comparable quality on this workload). Users who want max quality can flip to opus; users who want max speed can flip to haiku.
+
+## [2026-07-07 15:53] Panel spinner + command-triggered busy state
+Category: architecture
+Added a "Claude is thinking…" row with an animated spinner while `busy=true`. Previously, prompts sent from commands (`chatPanel.sendMessage(...)`) bypassed the panel state and never set busy — no visual feedback until the response streamed in. Fix: `sendMessage()` now routes through an internal `submit` callback that both appends the user message and sets busy, matching the input-field submit path.
+Rationale: the panel needs to look alive during long generations, especially for command flows where the user doesn't type into the input.
+
+## [2026-07-07 16:05] Runtime model selector in chat panel
+Category: architecture
+Added a `<select>` at the top of the chat panel with `opus`/`sonnet`/`haiku` options. Selection sends `{"type": "set_tier", "tier": "..."}` over the WebSocket; the chat handler closes and reopens the SDK client with the new tier via a new `tier_override` kwarg on `build_options()`. Server-side `ChatWebSocketHandler` now tracks `_tier` per connection and exposes `_start_client`/`_stop_client` helpers. `ready` frame gained a `tier` field so the UI reflects the active tier without re-parsing the model ID. Dropdown is disabled when backend is not `bedrock` (Anthropic direct uses the `model` trait, not tiers) or while a request is in flight.
+Rationale: users want per-conversation control over quality/speed without editing `jupyter_server_config.py`. Cost: switching resets conversation history (SDK is per-connection). Session `resume=` support could restore continuity — deferred.
+
+## [2026-07-07 16:05] Full command set on notebook toolbar
+Category: architecture
+`schema/plugin.json` now registers all four Claude commands in the notebook toolbar (ranks 60-63): Open Chat, Generate cell, Explain cell, Fix last error. Each command has an `icon` property so it renders as an icon-only toolbar button with a tooltip: `claudeIcon` (chat), `addIcon` (generate), `editIcon` (explain), `bugIcon` (fix). Cell toolbar keeps just Explain (rank 60) since Generate/Fix aren't cell-scoped.
+Rationale: user requested. Toolbar buttons are faster than palette lookup for frequent actions. Icons make the four functions discoverable at a glance.
+
+## [2026-07-07 16:05] Custom `claudeIcon` (blue SVG spark)
+Category: architecture
+New `src/icons.ts` exports `claudeIcon = new LabIcon({name, svgstr})` — an inline SVG showing a stylised blue 4-point spark (`#4361ee`) with a small companion mark. Replaces the built-in `codeIcon` on the sidebar tab, the Open Chat toolbar button, and the palette entry. Custom LabIcon avoids the need for a separate PNG/SVG file in the extension bundle.
+Rationale: user asked for the blue Claude-style icon instead of the generic `< >` code icon. `@jupyterlab/ui-components` doesn't ship a Claude/Anthropic mark; `LabIcon.svgstr` is the sanctioned path for custom icons. Colour is hard-coded; can be moved to a CSS variable if theming becomes needed.
+
+## [2026-07-07 16:20] MCP server enumeration + runtime selector
+Category: architecture
+Added `jupyter_claude/mcp_discovery.py` (`list_user_mcp_servers()` reads `~/.claude.json` `mcpServers` map), `enabled_mcp_servers: List(Unicode)` trait on `ClaudeExtensionApp` (default `["jupyter"]`), and two REST endpoints under `/jupyter-claude/mcp-servers` (GET returns list with description + enabled + required flags; POST persists selection). `agent.py`'s `_build_mcp_servers()` now assembles the SDK's `mcp_servers` dict from user config filtered by `enabled_mcp_servers` — `jupyter` is always included. `_allowed_tools_for()` generates `[f"mcp__{name}__*" for name in servers]` so only the enabled server namespaces are exposed to Claude. New `mcp_reload` WS frame restarts the SDK client with the fresh filter. Frontend: `src/mcpDialog.tsx` (React checkbox list wrapped in a `Dialog`) fetches via GET, saves via POST, then sends `mcp_reload`. New command `jclaude:mcp-servers` (extensionIcon) in palette + notebook toolbar.
+Rationale: user's `~/.claude.json` has 18 servers (mostly AWS/Azure clouds), each spawns a subprocess on SDK startup; startup lag was noticeable and Claude sees hundreds of tools it doesn't need. `enabled_mcp_servers` defaults to just `["jupyter"]` — everything else opt-in per session via the dialog.

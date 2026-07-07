@@ -1,6 +1,7 @@
 import { ReactWidget } from '@jupyterlab/apputils';
 import React, { useEffect, useRef, useState } from 'react';
 
+import { claudeIcon } from './icons';
 import { ChatClient, ServerMessage } from './ws';
 
 interface DisplayMessage {
@@ -12,10 +13,20 @@ interface DisplayMessage {
 let _idSeed = 0;
 const nextId = (): string => `m${++_idSeed}`;
 
-function ChatUI(props: { client: ChatClient }): JSX.Element {
+const TIERS: Array<'opus' | 'sonnet' | 'haiku'> = ['opus', 'sonnet', 'haiku'];
+
+interface ChatUIProps {
+  client: ChatClient;
+  registerSubmit: (fn: (text: string) => void) => void;
+}
+
+function ChatUI(props: ChatUIProps): JSX.Element {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [tier, setTier] = useState<'opus' | 'sonnet' | 'haiku'>('sonnet');
+  const [modelLabel, setModelLabel] = useState<string>('');
+  const [backend, setBackend] = useState<string>('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -23,6 +34,9 @@ function ChatUI(props: { client: ChatClient }): JSX.Element {
       setMessages(prev => {
         switch (m.type) {
           case 'ready':
+            setBackend(m.backend);
+            setModelLabel(m.model);
+            if ((m as any).tier) setTier((m as any).tier);
             return [
               ...prev,
               {
@@ -77,19 +91,62 @@ function ChatUI(props: { client: ChatClient }): JSX.Element {
       top: scrollRef.current.scrollHeight,
       behavior: 'smooth'
     });
-  }, [messages]);
+  }, [messages, busy]);
 
-  const submit = (): void => {
-    const text = draft.trim();
-    if (!text || busy) return;
-    setMessages(prev => [...prev, { role: 'user', text, id: nextId() }]);
-    props.client.send(text);
-    setDraft('');
+  const submitText = (text: string): void => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setMessages(prev => [
+      ...prev,
+      { role: 'user', text: trimmed, id: nextId() }
+    ]);
+    props.client.send(trimmed);
     setBusy(true);
+  };
+
+  useEffect(() => {
+    props.registerSubmit(submitText);
+  }, [props.registerSubmit]);
+
+  const submitFromInput = (): void => {
+    if (busy) return;
+    submitText(draft);
+    setDraft('');
+  };
+
+  const onTierChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
+    if (busy) return;
+    const next = e.target.value as 'opus' | 'sonnet' | 'haiku';
+    setTier(next);
+    props.client.setTier(next);
+    setMessages(prev => [
+      ...prev,
+      { role: 'system', text: `Switching to ${next}…`, id: nextId() }
+    ]);
   };
 
   return (
     <div className="jclaude-panel">
+      <div className="jclaude-header">
+        <label className="jclaude-header-label">Model</label>
+        <select
+          className="jclaude-tier-select"
+          value={tier}
+          onChange={onTierChange}
+          disabled={busy || backend !== 'bedrock'}
+          title={
+            backend === 'bedrock'
+              ? `Backend: ${backend}. Current model: ${modelLabel}`
+              : 'Tier switching is only available on the Bedrock backend'
+          }
+        >
+          {TIERS.map(t => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="jclaude-messages" ref={scrollRef}>
         {messages.map(m => (
           <div key={m.id} className={`jclaude-msg jclaude-msg-${m.role}`}>
@@ -97,6 +154,12 @@ function ChatUI(props: { client: ChatClient }): JSX.Element {
             <div className="jclaude-msg-text">{m.text}</div>
           </div>
         ))}
+        {busy && (
+          <div className="jclaude-msg jclaude-msg-thinking">
+            <div className="jclaude-spinner" />
+            <span className="jclaude-msg-text">Claude is thinking…</span>
+          </div>
+        )}
       </div>
       <div className="jclaude-input-row">
         <textarea
@@ -106,7 +169,7 @@ function ChatUI(props: { client: ChatClient }): JSX.Element {
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
-              submit();
+              submitFromInput();
             }
           }}
           placeholder={
@@ -117,7 +180,7 @@ function ChatUI(props: { client: ChatClient }): JSX.Element {
         />
         <button
           className="jclaude-send"
-          onClick={submit}
+          onClick={submitFromInput}
           disabled={busy || !draft.trim()}
         >
           Send
@@ -128,19 +191,33 @@ function ChatUI(props: { client: ChatClient }): JSX.Element {
 }
 
 export class ChatPanelWidget extends ReactWidget {
+  private _submit: ((text: string) => void) | null = null;
+
   constructor(private readonly client: ChatClient) {
     super();
     this.id = 'jupyter-claude:chat-panel';
     this.title.caption = 'Claude';
     this.title.label = 'Claude';
+    this.title.icon = claudeIcon;
     this.addClass('jclaude-panel-widget');
   }
 
   render(): JSX.Element {
-    return <ChatUI client={this.client} />;
+    return (
+      <ChatUI
+        client={this.client}
+        registerSubmit={fn => {
+          this._submit = fn;
+        }}
+      />
+    );
   }
 
   sendMessage(text: string): void {
-    this.client.send(text);
+    if (this._submit) {
+      this._submit(text);
+    } else {
+      this.client.send(text);
+    }
   }
 }

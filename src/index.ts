@@ -1,5 +1,6 @@
 import {
   ILabShell,
+  ILayoutRestorer,
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
@@ -19,13 +20,14 @@ const plugin: JupyterFrontEndPlugin<void> = {
     'Collaborate with Claude on Jupyter notebook code and documentation',
   autoStart: true,
   requires: [INotebookTracker, ILabShell],
-  optional: [ISettingRegistry, ICommandPalette],
+  optional: [ISettingRegistry, ICommandPalette, ILayoutRestorer],
   activate: (
     app: JupyterFrontEnd,
     tracker: INotebookTracker,
     labShell: ILabShell,
     settingRegistry: ISettingRegistry | null,
-    palette: ICommandPalette | null
+    palette: ICommandPalette | null,
+    restorer: ILayoutRestorer | null
   ) => {
     console.log(`JupyterLab extension ${PLUGIN_ID} is activated!`);
 
@@ -43,13 +45,13 @@ const plugin: JupyterFrontEndPlugin<void> = {
     const client = new ChatClient();
     const chatPanel = new ChatPanelWidget(client);
 
-    registerCommands(app, tracker, labShell, palette, chatPanel);
+    registerCommands(app, tracker, labShell, palette, chatPanel, client);
 
-    app.restored.then(() => {
-      if (!chatPanel.isAttached) {
-        labShell.add(chatPanel, 'right', { rank: 900 });
-      }
-    });
+    labShell.add(chatPanel, 'right', { rank: 900 });
+
+    if (restorer) {
+      restorer.add(chatPanel, chatPanel.id);
+    }
 
     console.log(
       `${PLUGIN_ID} commands registered:`,

@@ -1,24 +1,33 @@
 import { CommandRegistry } from '@lumino/commands';
 
 import { ILabShell, JupyterFrontEnd } from '@jupyterlab/application';
-import { ICommandPalette } from '@jupyterlab/apputils';
+import { ICommandPalette, InputDialog } from '@jupyterlab/apputils';
 import {
   INotebookTracker,
   NotebookActions,
   NotebookPanel
 } from '@jupyterlab/notebook';
+import {
+  addIcon,
+  bugIcon,
+  editIcon,
+  extensionIcon
+} from '@jupyterlab/ui-components';
 
+import { claudeIcon } from './icons';
+import { pickMcpServers } from './mcpDialog';
 import { ChatPanelWidget } from './panel';
+import { ChatClient } from './ws';
 
 export const CommandIDs = {
   openChat: 'jclaude:open-chat',
   generateCell: 'jclaude:generate-cell',
   explainCell: 'jclaude:explain-cell',
-  fixLastError: 'jclaude:fix-last-error'
+  fixLastError: 'jclaude:fix-last-error',
+  mcpServers: 'jclaude:mcp-servers'
 };
 
 interface LastError {
-  notebookId: string;
   cellSource: string;
   errorName: string;
   errorValue: string;
@@ -39,15 +48,15 @@ function activeCell(tracker: INotebookTracker): {
 
 function trackCellErrors(tracker: INotebookTracker): void {
   NotebookActions.executed.connect((_, args) => {
-    const { notebook, cell, success } = args as {
-      notebook: { id?: string };
+    const { cell, success } = args as {
       cell: { model: { sharedModel: { getSource(): string }; outputs?: any } };
       success: boolean;
-      error?: unknown;
     };
     if (success) return;
 
-    const nbId = notebook.id ?? tracker.currentWidget?.id ?? 'unknown';
+    const nbId = tracker.currentWidget?.id;
+    if (!nbId) return;
+
     const source = cell.model.sharedModel.getSource();
 
     let errName = 'Error';
@@ -68,13 +77,22 @@ function trackCellErrors(tracker: INotebookTracker): void {
     }
 
     lastErrors.set(nbId, {
-      notebookId: nbId,
       cellSource: source,
       errorName: errName,
       errorValue: errValue,
       traceback
     });
+    console.log(
+      `jupyter-claude: captured error for notebook ${nbId}: ${errName}: ${errValue}`
+    );
   });
+}
+
+function revealChat(chatPanel: ChatPanelWidget, labShell: ILabShell): void {
+  if (!chatPanel.isAttached) {
+    labShell.add(chatPanel, 'right', { rank: 900 });
+  }
+  labShell.activateById(chatPanel.id);
 }
 
 export function registerCommands(
@@ -82,7 +100,8 @@ export function registerCommands(
   tracker: INotebookTracker,
   labShell: ILabShell,
   palette: ICommandPalette | null,
-  chatPanel: ChatPanelWidget
+  chatPanel: ChatPanelWidget,
+  chatClient: ChatClient
 ): void {
   const commands: CommandRegistry = app.commands;
   const category = 'Claude';
@@ -92,44 +111,64 @@ export function registerCommands(
   commands.addCommand(CommandIDs.openChat, {
     label: 'Open Claude Chat',
     caption: 'Open the Claude assistant panel',
-    execute: () => {
-      if (!chatPanel.isAttached) {
-        labShell.add(chatPanel, 'right', { rank: 900 });
-      }
-      labShell.activateById(chatPanel.id);
-    }
+    icon: claudeIcon,
+    execute: () => revealChat(chatPanel, labShell)
   });
 
   commands.addCommand(CommandIDs.generateCell, {
     label: 'Generate cell with Claude…',
     caption: 'Ask Claude to generate a new cell in the current notebook',
+    icon: addIcon,
     isEnabled: () => tracker.currentWidget !== null,
     execute: async () => {
       const panel = tracker.currentWidget;
       if (!panel) return;
-      const prompt = window.prompt('Describe the cell to generate:');
-      if (!prompt) return;
-      if (!chatPanel.isAttached) {
-        labShell.add(chatPanel, 'right', { rank: 900 });
+
+      const typeChoice = await InputDialog.getItem({
+        title: 'Generate cell with Claude',
+        label: 'Cell type:',
+        items: ['code', 'markdown', 'raw'],
+        current: 0,
+        editable: false,
+        okLabel: 'Next'
+      });
+      if (!typeChoice.button.accept || !typeChoice.value) return;
+      const cellType = typeChoice.value as 'code' | 'markdown' | 'raw';
+
+      const placeholders: Record<typeof cellType, string> = {
+        code: 'e.g. load iris.csv into a pandas DataFrame and show df.head()',
+        markdown: 'e.g. an intro section titled "Data loading" describing the next few cells',
+        raw: 'e.g. an nbconvert-only LaTeX preamble block'
+      };
+      const description = await InputDialog.getText({
+        title: `Generate ${cellType} cell with Claude`,
+        label: `Describe the ${cellType} cell to generate:`,
+        placeholder: placeholders[cellType],
+        okLabel: 'Generate'
+      });
+      if (!description.button.accept || !description.value) return;
+
+      revealChat(chatPanel, labShell);
+
+      let prompt: string;
+      if (cellType === 'code') {
+        prompt = `Please insert a new code cell in the current notebook that does the following: ${description.value}\n\nUse mcp__jupyter__insert_execute_code_cell (or insert_cell followed by execute_cell) to add it. Do not just show the code as text.`;
+      } else {
+        prompt = `Please insert a new ${cellType} cell in the current notebook with the following content: ${description.value}\n\nUse mcp__jupyter__insert_cell with cell_type="${cellType}". Do NOT execute the cell — ${cellType} cells are not executable. Return the raw content the cell should contain.`;
       }
-      labShell.activateById(chatPanel.id);
-      chatPanel.sendMessage(
-        `Please insert a new code cell in the current notebook that does the following: ${prompt}\n\nUse the mcp__jupyter__insert_execute_code_cell tool (or insert_cell followed by execute_cell) to add it. Do not just show the code as text.`
-      );
+      chatPanel.sendMessage(prompt);
     }
   });
 
   commands.addCommand(CommandIDs.explainCell, {
     label: 'Explain this cell with Claude',
     caption: 'Ask Claude to insert a markdown cell explaining the active cell',
+    icon: editIcon,
     isEnabled: () => activeCell(tracker) !== null,
     execute: async () => {
       const info = activeCell(tracker);
       if (!info) return;
-      if (!chatPanel.isAttached) {
-        labShell.add(chatPanel, 'right', { rank: 900 });
-      }
-      labShell.activateById(chatPanel.id);
+      revealChat(chatPanel, labShell);
       chatPanel.sendMessage(
         `Please insert a markdown cell ABOVE the currently active cell in the notebook that explains what this code does. The code to explain is:\n\n\`\`\`\n${info.source}\n\`\`\`\n\nUse mcp__jupyter__insert_cell with cell_type=markdown at the appropriate position. Keep the explanation focused and technical.`
       );
@@ -137,29 +176,45 @@ export function registerCommands(
   });
 
   commands.addCommand(CommandIDs.fixLastError, {
-    label: "Fix last error with Claude",
+    label: 'Fix last error with Claude',
     caption:
       'Ask Claude to insert a corrected cell for the most recent cell error',
-    isEnabled: () => {
-      const nb = tracker.currentWidget;
-      return nb !== null && lastErrors.has(nb.id);
-    },
+    icon: bugIcon,
+    isEnabled: () => tracker.currentWidget !== null,
     execute: async () => {
       const nb = tracker.currentWidget;
       if (!nb) return;
       const err = lastErrors.get(nb.id);
       if (!err) {
-        window.alert('No recent cell error captured for this notebook.');
+        await InputDialog.getText({
+          title: 'Fix last error with Claude',
+          label:
+            'No recent cell error captured for this notebook. Run a cell that raises an error, then try again.'
+        });
         return;
       }
-      if (!chatPanel.isAttached) {
-        labShell.add(chatPanel, 'right', { rank: 900 });
-      }
-      labShell.activateById(chatPanel.id);
+      revealChat(chatPanel, labShell);
       const traceback = err.traceback.join('\n');
       chatPanel.sendMessage(
         `A cell in the current notebook raised an error. Please insert a new code cell BELOW the failed cell containing a corrected version. Use mcp__jupyter__insert_execute_code_cell.\n\nFailed cell source:\n\`\`\`\n${err.cellSource}\n\`\`\`\n\nError: ${err.errorName}: ${err.errorValue}\n\nTraceback:\n\`\`\`\n${traceback}\n\`\`\``
       );
+    }
+  });
+
+  commands.addCommand(CommandIDs.mcpServers, {
+    label: 'MCP servers…',
+    caption: 'Choose which MCP servers Claude may use',
+    icon: extensionIcon,
+    execute: async () => {
+      try {
+        const enabled = await pickMcpServers();
+        if (enabled === null) return;
+        chatClient.reloadMcp();
+        revealChat(chatPanel, labShell);
+        console.log(`jupyter-claude: enabled MCP servers = ${enabled.join(', ')}`);
+      } catch (err) {
+        console.error('jupyter-claude MCP dialog failed', err);
+      }
     }
   });
 

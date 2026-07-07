@@ -9,9 +9,13 @@ A JupyterLab extension enabling collaborative development between users and Clau
 ## Features (v1)
 
 - **Chat about the notebook** — ask Claude to analyze, summarize, or answer questions about your entire notebook
-- **Generate a cell** — describe what you want, Claude generates working code and inserts it
+- **Generate a cell** — describe what you want; choose cell type (code/markdown/raw); Claude generates and inserts it
 - **Explain a cell** — Claude documents an existing cell with a markdown explanation
 - **Fix last error** — Claude sees the error from your last cell run and offers a corrected version
+- **Runtime tier selector** — switch between opus/sonnet/haiku in the chat panel for quality/speed tradeoffs (Bedrock only)
+- **MCP server management** — enable/disable individual MCP servers from `~/.claude.json` per session (defaults to Jupyter only for faster startup)
+- **Notebook toolbar buttons** — five icons in the toolbar for quick access to all v1 commands plus MCP server selector
+- **Visual feedback** — animated "Claude is thinking…" spinner while processing
 
 ## Requirements
 
@@ -67,8 +71,8 @@ Configuration lives in the extension traits (not shell env — the extension wri
 
 - `backend = "bedrock"`
 - `aws_region = "us-east-1"` (or your region)
-- `aws_profile = "<your profile>"` — a named profile from `~/.aws/config`
-- `default_opus_model`, `default_sonnet_model`, `default_haiku_model` — inference-profile IDs (defaults are set for the current Bedrock lineup: `us.anthropic.claude-opus-4-7`, `us.anthropic.claude-sonnet-4-6`, `us.anthropic.claude-haiku-4-5-20251001-v1:0`)
+- `aws_profile = "<your profile>"` — a named profile from `~/.aws/config` (enables shared AWS SSO; profile and region are forwarded to the SDK subprocess)
+- `default_opus_model`, `default_sonnet_model`, `default_haiku_model` — inference-profile model IDs (defaults: `us.anthropic.claude-opus-4-7`, `us.anthropic.claude-sonnet-4-6`, `us.anthropic.claude-haiku-4-5-20251001-v1:0`)
 
 Refresh your SSO session and start Jupyter with `aws-vault` so the subprocess inherits temporary STS credentials without leaking them to disk:
 

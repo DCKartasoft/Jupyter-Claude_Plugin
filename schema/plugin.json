@@ -13,6 +13,26 @@
         "name": "jclaude-open-chat",
         "command": "jclaude:open-chat",
         "rank": 60
+      },
+      {
+        "name": "jclaude-generate-cell",
+        "command": "jclaude:generate-cell",
+        "rank": 61
+      },
+      {
+        "name": "jclaude-explain-cell",
+        "command": "jclaude:explain-cell",
+        "rank": 62
+      },
+      {
+        "name": "jclaude-fix-last-error",
+        "command": "jclaude:fix-last-error",
+        "rank": 63
+      },
+      {
+        "name": "jclaude-mcp-servers",
+        "command": "jclaude:mcp-servers",
+        "rank": 64
       }
     ]
   },
@@ -62,6 +82,13 @@
       "default": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
       "title": "Default Haiku model (Bedrock)",
       "description": "Bedrock inference-profile ID for the Haiku tier."
+    },
+    "mainModelTier": {
+      "type": "string",
+      "enum": ["opus", "sonnet", "haiku"],
+      "default": "sonnet",
+      "title": "Main model tier (Bedrock)",
+      "description": "Which tier runs the main conversation. `opus` is highest quality but slowest; `sonnet` (default) is a good balance; `haiku` is fastest."
     },
     "systemPrompt": {
       "type": "string",

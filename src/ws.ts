@@ -58,7 +58,19 @@ export interface UserMessagePayload {
   text: string;
 }
 
-export type ClientMessage = UserMessagePayload;
+export interface SetTierPayload {
+  type: 'set_tier';
+  tier: 'opus' | 'sonnet' | 'haiku';
+}
+
+export interface McpReloadPayload {
+  type: 'mcp_reload';
+}
+
+export type ClientMessage =
+  | UserMessagePayload
+  | SetTierPayload
+  | McpReloadPayload;
 
 export type MessageHandler = (msg: ServerMessage) => void;
 
@@ -120,6 +132,19 @@ export class ChatClient {
 
   send(text: string): void {
     const msg: ClientMessage = { type: 'user_message', text };
+    this._sendRaw(msg);
+  }
+
+  setTier(tier: 'opus' | 'sonnet' | 'haiku'): void {
+    const msg: ClientMessage = { type: 'set_tier', tier };
+    this._sendRaw(msg);
+  }
+
+  reloadMcp(): void {
+    this._sendRaw({ type: 'mcp_reload' } as ClientMessage);
+  }
+
+  private _sendRaw(msg: ClientMessage): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
     } else {

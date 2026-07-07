@@ -18,6 +18,32 @@
   font-size: var(--jp-ui-font-size1);
 }
 
+.jclaude-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--jp-border-color2);
+  background: var(--jp-layout-color0);
+}
+
+.jclaude-header-label {
+  font-size: var(--jp-ui-font-size0);
+  color: var(--jp-ui-font-color2);
+  text-transform: uppercase;
+}
+
+.jclaude-tier-select {
+  flex: 1 1 auto;
+  padding: 3px 6px;
+  background: var(--jp-layout-color1);
+  color: var(--jp-ui-font-color1);
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 3px;
+  font-family: var(--jp-ui-font-family);
+  font-size: var(--jp-ui-font-size1);
+}
+
 .jclaude-messages {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -97,4 +123,87 @@
 .jclaude-send:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.jclaude-msg-thinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--jp-ui-font-color2);
+  font-style: italic;
+  font-size: var(--jp-ui-font-size1);
+}
+
+.jclaude-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--jp-border-color2);
+  border-top-color: var(--jp-brand-color1);
+  border-radius: 50%;
+  animation: jclaude-spin 0.8s linear infinite;
+  flex: 0 0 auto;
+}
+
+@keyframes jclaude-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.jclaude-mcp-dialog {
+  min-width: 420px;
+}
+
+.jclaude-mcp-hint {
+  margin: 0 0 12px 0;
+  color: var(--jp-ui-font-color2);
+  font-size: var(--jp-ui-font-size1);
+}
+
+.jclaude-mcp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.jclaude-mcp-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 2px;
+  align-items: baseline;
+  padding: 4px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.jclaude-mcp-item:hover {
+  background: var(--jp-layout-color2);
+}
+
+.jclaude-mcp-item input[type='checkbox'] {
+  grid-row: span 2;
+  align-self: center;
+}
+
+.jclaude-mcp-name {
+  font-weight: 600;
+  color: var(--jp-ui-font-color1);
+}
+
+.jclaude-mcp-required {
+  font-weight: 400;
+  color: var(--jp-ui-font-color2);
+  font-size: var(--jp-ui-font-size0);
+}
+
+.jclaude-mcp-desc {
+  grid-column: 2;
+  color: var(--jp-ui-font-color2);
+  font-size: var(--jp-ui-font-size0);
+  font-family: var(--jp-code-font-family);
 }

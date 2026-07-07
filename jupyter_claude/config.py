@@ -1,5 +1,5 @@
 from jupyter_server.extension.application import ExtensionApp
-from traitlets import Bool, Enum, Unicode
+from traitlets import Bool, Enum, List, Unicode
 
 
 class ClaudeExtensionApp(ExtensionApp):
@@ -59,6 +59,17 @@ class ClaudeExtensionApp(ExtensionApp):
         "backend is `bedrock`.",
     )
 
+    main_model_tier = Enum(
+        ["opus", "sonnet", "haiku"],
+        default_value="sonnet",
+        config=True,
+        help="Which tier the main conversation model runs on. `opus` is "
+        "highest quality but slowest; `sonnet` (default) is a good balance; "
+        "`haiku` is fastest. On Bedrock this sets ANTHROPIC_MODEL to the "
+        "corresponding default_{tier}_model. On Anthropic direct this is "
+        "ignored — use the `model` trait instead.",
+    )
+
     system_prompt = Unicode(
         "You are a helpful assistant collaborating with a data scientist inside "
         "a JupyterLab notebook. You can read, write, and execute notebook cells "
@@ -74,6 +85,16 @@ class ClaudeExtensionApp(ExtensionApp):
         config=True,
         help="URL of the Jupyter MCP server. Empty string means auto-detect from "
         "the running Jupyter server's port and token.",
+    )
+
+    enabled_mcp_servers = List(
+        trait=Unicode(),
+        default_value=["jupyter"],
+        config=True,
+        help="Names of MCP servers Claude may connect to. Servers are "
+        "discovered from ~/.claude.json (user-scope Claude Code config) plus "
+        "the built-in `jupyter` server. Fewer servers = faster startup. "
+        "`jupyter` is always included even if omitted here.",
     )
 
     permission_mode = Enum(
@@ -111,9 +132,10 @@ class ClaudeExtensionApp(ExtensionApp):
 
     def initialize_handlers(self):
         from .chat_handler import ChatWebSocketHandler
-        from .routes import HelloRouteHandler
+        from .routes import HelloRouteHandler, McpServersHandler
 
         self.handlers.extend([
             (r"/jupyter-claude/hello", HelloRouteHandler),
             (r"/jupyter-claude/chat", ChatWebSocketHandler),
+            (r"/jupyter-claude/mcp-servers", McpServersHandler),
         ])

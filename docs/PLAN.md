@@ -66,47 +66,44 @@ Install dev deps (uv-native, keeps `pyproject.toml` as the source of truth):
 
 ```bash
 jlpm install                                                    # frontend deps
-uv pip install -e ".[test]"                                     # editable install of the extension
+uv pip install -e ".[dev,test]"                                 # editable install of the extension
 uv pip install jupyter-mcp-server jupyter-collaboration claude-agent-sdk
+
+# Link the labextension so Jupyter serves in-tree builds (required for dev)
+jupyter labextension develop . --overwrite
+jupyter server extension enable jupyter_claude
 ```
 
 Prereq: Node ≥ 20 (`brew install node`) — the copier template's build (`jlpm build`) needs it.
 
 ## Step 2 — Server extension (Python)
 
-**Files:** [jupyter_claude/handlers.py], [jupyter_claude/agent.py] (new), [jupyter_claude/config.py] (new), [jupyter_claude/__init__.py].
+**Files:** [jupyter_claude/handlers.py], [jupyter_claude/agent.py] (new), [jupyter_claude/config.py] (new), [jupyter_claude/mcp_discovery.py] (new), [jupyter_claude/__init__.py].
 
 - `config.py` — a `jupyter_server.extension.application.ExtensionApp` traitlets class exposing:
   - `backend: Enum("anthropic", "bedrock")`
   - `model: Unicode` (e.g. `us.anthropic.claude-opus-4-8` for Bedrock, `claude-opus-4-8` for Anthropic direct)
   - `aws_region: Unicode` (Bedrock only)
+  - `aws_profile: Unicode` (Bedrock only; named AWS SSO profile from `~/.aws/config`; profile and region are forwarded to the SDK subprocess)
+  - `default_opus_model`, `default_sonnet_model`, `default_haiku_model: Unicode` (Bedrock; inference-profile IDs; defaults: `us.anthropic.claude-opus-4-7`, `us.anthropic.claude-sonnet-4-6`, `us.anthropic.claude-haiku-4-5-20251001-v1:0`)
+  - `main_model_tier: Enum(["opus", "sonnet", "haiku"], default="sonnet")` (Bedrock only; speed/quality tradeoff; resolved tier's model ID is set as `ANTHROPIC_MODEL`)
+  - `enabled_mcp_servers: List(Unicode)` (default `["jupyter"]`; which servers from `~/.claude.json` should be active; used to filter `allowed_tools`)
   - `system_prompt: Unicode`
   - Overridable via `jupyter_server_config.py` **and** the JupyterLab Settings Editor (schema mirrored in `schema/plugin.json`).
-- `agent.py` — `build_options(cfg, jupyter_token) → ClaudeAgentOptions`:
-  ```python
-  env = {}
-  if cfg.backend == "bedrock":
-      env["CLAUDE_CODE_USE_BEDROCK"] = "1"
-      env["AWS_REGION"] = cfg.aws_region
-      env["ANTHROPIC_MODEL"] = cfg.model  # must be inference-profile ID, e.g. us.anthropic.claude-opus-4-8
-  return ClaudeAgentOptions(
-      env=env,
-      system_prompt=cfg.system_prompt,
-      mcp_servers={
-          "jupyter": {
-              "type": "http",
-              "url": f"http://localhost:{server_port}/mcp",
-              "headers": {"Authorization": f"token {jupyter_token}"},
-          }
-      },
-      allowed_tools=["mcp__jupyter__*"],
-      permission_prompt_tool_name="jclaude_approve",  # frontend modal
-  )
-  ```
-- `handlers.py` — one `WebSocketHandler` at `/jclaude/chat`. Per-connection state:
-  - `async with ClaudeSDKClient(options=...) as client:`
-  - Inbound WS messages: `{type: "user_message", text, notebook_ctx}` → `await client.query(prompt)`; `{type: "approve", tool_use_id, allow}` → resolves permission promise.
-  - Outbound: stream every `TextBlock` / `ToolUseBlock` / `ResultMessage` as JSON frames.
+- `agent.py` — `build_options(cfg, jupyter_token, tier_override=None) → ClaudeAgentOptions`:
+  - Builds SDK environment dict with backend selection (env vars for Bedrock, ANTHROPIC_API_KEY left in env for Anthropic direct).
+  - For Bedrock, sets `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL` and optionally `ANTHROPIC_MODEL` for the chosen tier (defaults to `cfg.main_model_tier`, overridable via `tier_override` when user switches in chat panel).
+  - Assembles `mcp_servers` dict filtered by `cfg.enabled_mcp_servers` (always includes `jupyter`).
+  - Returns `ClaudeAgentOptions` with `allowed_tools=[f"mcp__{name}__*" for name in enabled_servers]` — restricts Claude to only the user-enabled MCP namespaces.
+- `mcp_discovery.py` — `list_user_mcp_servers() → List[Dict]`:
+  - Reads `~/.claude.json` and extracts `mcpServers` map.
+  - Returns list of server dicts with `{name, description, enabled, required_status}` for each server.
+- `handlers.py` — multiple WebSocket and REST endpoints:
+  - WebSocket handler at `/jupyter-claude/chat`. Per-connection state with `_client` (async ClaudeSDKClient), `_tier` (active tier for Bedrock).
+    - Inbound WS messages: `{type: "user_message", text, notebook_ctx}` → `await client.query(prompt)`; `{type: "approve", tool_use_id, allow}` → resolves permission promise; `{type: "set_tier", tier}` → `_stop_client()`, rebuild options with new tier, `_start_client()`.
+    - Outbound: stream every `TextBlock` / `ToolUseBlock` / `ResultMessage` as JSON frames. `ready` frame includes active `tier` field.
+  - REST GET `/jupyter-claude/mcp-servers` — returns list of available servers with `{name, description, enabled, required}` flags.
+  - REST POST `/jupyter-claude/mcp-servers` — persists updated `enabled_mcp_servers` list to extension traits; returns 200 on success.
 - `__init__.py` — expose `_jupyter_server_extension_points()` returning the ExtensionApp; template already wires `_jupyter_labextension_paths()`.
 
 **Reuse:** `jupyter-mcp-server` runs as a Jupyter server extension in the same process — no subprocess management. It exposes `mcp__jupyter__{read_cell, insert_cell, overwrite_cell_source, execute_cell, insert_execute_code_cell, read_notebook, list_notebooks, use_notebook, ...}` — sufficient for all four v1 interactions.
@@ -119,13 +116,15 @@ Prereq: Node ≥ 20 (`brew install node`) — the copier template's build (`jlpm
   - Register commands (see `commands.ts`).
   - Create a `ReactWidget` chat panel, `app.shell.add(widget, 'right', { rank: 900 })`.
   - Attach `NotebookActions.executed.connect(onCellExecuted)` — capture `{success:false, error}` and buffer the last error per notebook for the "Fix last error" command.
-- `src/commands.ts` — four commands, each posts a WS message with the right prompt template and instructs Claude to use `mcp__jupyter__*` tools:
-  - `jclaude:chat` (open panel; palette + right sidebar button)
-  - `jclaude:generate-cell` (sends `Generate a cell that: <text>` with instruction to call `mcp__jupyter__insert_execute_code_cell`)
-  - `jclaude:explain-cell` (selector `.jp-Notebook .jp-Cell`; reads `cell.model.sharedModel.getSource()`, sends `Explain this cell in a markdown doc:` with instruction to call `mcp__jupyter__insert_cell` above)
-  - `jclaude:fix-last-error` (uses buffered error + cell source; instructs Claude to use `mcp__jupyter__insert_cell` or `insert_execute_code_cell` below the error)
-  - Register on cell toolbar via `schema/plugin.json` `"jupyter.lab.toolbars": { "Cell": [...] }` and on context menu via `app.contextMenu.addItem({ command, selector: '.jp-Notebook .jp-Cell' })`.
-- `src/panel.tsx` — chat UI. Start with a plain scrolling message list + input; wire markdown rendering with `@jupyterlab/rendermime`. Do **not** pull in `@jupyter/chat` for v1 (Yjs shared-doc storage is overkill).
+- `src/commands.ts` — five commands, each posts a WS message with the right prompt template and instructs Claude to use `mcp__jupyter__*` tools:
+  - `jclaude:open-chat` (open panel; palette + notebook toolbar button)
+  - `jclaude:generate-cell` (modal to choose cell type; sends prompt with instruction to call `mcp__jupyter__insert_execute_code_cell` or `insert_cell` per type)
+  - `jclaude:explain-cell` (cell context menu + toolbar; reads source, sends prompt with instruction to call `mcp__jupyter__insert_cell` above)
+  - `jclaude:fix-last-error` (palette + notebook toolbar; uses buffered error; instructs Claude to use `mcp__jupyter__insert_cell` or `insert_execute_code_cell` below)
+  - `jclaude:mcp-servers` (palette + notebook toolbar; opens MCP server selector dialog)
+  - Register on toolbars via `schema/plugin.json` `"jupyter.lab.toolbars"` and context menu via `app.contextMenu.addItem()`.
+- `src/panel.tsx` — chat UI: scrolling message list (user/assistant/tool/system roles), animated spinner while busy, runtime tier selector (`<select>` disabled for Anthropic direct or mid-request), input textarea. Wire markdown rendering via `@jupyterlab/rendermime`. Do **not** pull in `@jupyter/chat` for v1 (Yjs shared-doc storage is overkill).
+- `src/mcpDialog.tsx` — React dialog for MCP server selector: checkbox list of servers, GET `/jupyter-claude/mcp-servers` to fetch, POST to persist, send `mcp_reload` on change.
 - `src/ws.ts` — thin wrapper around `new WebSocket(URLExt.join(ServerConnection.makeSettings().wsUrl, 'jclaude/chat'))` with auto-reconnect and typed message events.
 - `schema/plugin.json` — settings schema mirroring `config.py` traits (backend, model, aws_region, system_prompt) so users edit them in Settings Editor.
 
@@ -151,15 +150,18 @@ Only if we want token-by-token fill-in of a cell being generated: add `@tool("st
 
 | File | Purpose |
 |---|---|
-| [jupyter_claude/config.py] | Backend + model + AWS region traitlets |
-| [jupyter_claude/agent.py] | Build `ClaudeAgentOptions`, wire MCP servers |
-| [jupyter_claude/handlers.py] | WS handler owning the SDK session |
+| [jupyter_claude/config.py] | Backend + model + AWS region + MCP traitlets |
+| [jupyter_claude/agent.py] | Build `ClaudeAgentOptions`, filter MCP servers by enabled list |
+| [jupyter_claude/mcp_discovery.py] | List user's registered MCP servers from `~/.claude.json` |
+| [jupyter_claude/handlers.py] | WS chat handler, REST MCP-servers endpoints, tier switching |
 | [jupyter_claude/__init__.py] | Extension entrypoints |
 | [src/index.ts] | Plugin activate, tracker + shell wiring |
-| [src/commands.ts] | Four v1 commands + cell-error capture |
-| [src/panel.tsx] | React chat panel |
-| [src/ws.ts] | WS client |
-| [schema/plugin.json] | Cell toolbar registration + settings schema |
+| [src/commands.ts] | Five v1 commands + cell-error capture |
+| [src/panel.tsx] | React chat panel with tier selector + spinner |
+| [src/mcpDialog.tsx] | MCP server selector dialog |
+| [src/ws.ts] | WS client with typed messages |
+| [src/icons.ts] | Custom `claudeIcon` SVG |
+| [schema/plugin.json] | Toolbar registration + settings schema |
 | [pyproject.toml] | Add `claude-agent-sdk`, `jupyter-mcp-server`, `jupyter-collaboration` |
 
 ## Out of scope for v1
