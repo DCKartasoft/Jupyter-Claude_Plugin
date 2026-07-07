@@ -1,13 +1,13 @@
 import json
 
+import tornado
 from jupyter_server.base.handlers import APIHandler
 from jupyter_server.utils import url_path_join
-import tornado
+
+from .chat_handler import ChatWebSocketHandler
+
 
 class HelloRouteHandler(APIHandler):
-    # The following decorator should be present on all verb methods (head, get, post,
-    # patch, put, delete, options) to ensure only authorized user can request the
-    # Jupyter server
     @tornado.web.authenticated
     def get(self):
         self.finish(json.dumps({
@@ -19,11 +19,13 @@ class HelloRouteHandler(APIHandler):
         }))
 
 
-def setup_route_handlers(web_app):
-    host_pattern = ".*$"
+def build_route_handlers(web_app):
     base_url = web_app.settings["base_url"]
+    return [
+        (url_path_join(base_url, "jupyter-claude", "hello"), HelloRouteHandler),
+        (url_path_join(base_url, "jupyter-claude", "chat"), ChatWebSocketHandler),
+    ]
 
-    hello_route_pattern = url_path_join(base_url, "jupyter-claude", "hello")
-    handlers = [(hello_route_pattern, HelloRouteHandler)]
 
-    web_app.add_handlers(host_pattern, handlers)
+def setup_route_handlers(web_app):
+    web_app.add_handlers(".*$", build_route_handlers(web_app))

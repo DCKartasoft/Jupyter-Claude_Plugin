@@ -57,7 +57,7 @@ pip uninstall jupyter_claude
 
 In development mode, you will also need to remove the symlink created by `jupyter-builder develop`
 command. To find its location, you can run `jupyter labextension list` to figure out where the `labextensions`
-folder is located. Then you can remove the symlink named `myextension@dc-ks/jupyter-claude` within that folder.
+folder is located. Then you can remove the symlink named `@dckartasoft/jupyter-claude` within that folder.
 
 ## Testing the extension
 

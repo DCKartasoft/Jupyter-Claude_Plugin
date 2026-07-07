@@ -94,3 +94,13 @@ Rationale: JupyterLab convention. Two changelogs is confusing; `jupyter-releaser
 Category: cleanup
 Deleted `main.py` (uv init boilerplate) and `Jupyter-Claude-Plug.py` (empty Day-1 stub). Both superseded by the copier scaffold.
 Rationale: dead files.
+
+## [2026-07-07 12:15] Server extension built (Step 2)
+Category: architecture
+Added `jupyter_claude/config.py` (`ClaudeExtensionApp(ExtensionApp)` with traits: backend, model, aws_region, system_prompt, jupyter_mcp_url, permission_mode, verbose), `agent.py` (`build_options()` returns `ClaudeAgentOptions` wired to Jupyter MCP), and `chat_handler.py` (`ChatWebSocketHandler`, one SDK client per WS connection). `__init__.py` now registers via `{"module": "jupyter_claude", "app": ClaudeExtensionApp}` — the ExtensionApp `initialize_handlers` binds `/jupyter-claude/hello` (kept for smoke tests) and `/jupyter-claude/chat` (WebSocket). Backend selection is env-var driven at query time; users configure via `jupyter_server_config.py` or the JupyterLab Settings Editor (schema/plugin.json mirrors the traits).
+Rationale: ExtensionApp is the future-proof path (matches jupyter-ai); per-WS SDK client is the simplest session model for v1 and matches the SDK's `async with` idiom.
+
+## [2026-07-07 12:15] Stale malformed name refs cleaned up
+Category: cleanup
+Fixed remaining `myextension@dc-ks/jupyter-claude` references in `jupyter_claude/__init__.py`, `src/index.ts`, `src/__tests__/jupyter_claude.spec.ts`, `ui-tests/tests/jupyter_claude.spec.ts`, `CONTRIBUTING.md`. The earlier fix in Step 1 only covered JSON/YAML/TOML; missed Python/TS/MD.
+Rationale: leftover refs would break plugin ID matching in the frontend activate hook and integration tests.

@@ -3,6 +3,39 @@
   "title": "Jupyter Claude",
   "description": "Settings for the Jupyter Claude collaboration extension.",
   "type": "object",
-  "properties": {},
+  "properties": {
+    "backend": {
+      "type": "string",
+      "enum": ["anthropic", "bedrock"],
+      "default": "anthropic",
+      "title": "Backend",
+      "description": "Which Claude backend to use. `anthropic` requires ANTHROPIC_API_KEY. `bedrock` uses the AWS credential chain."
+    },
+    "model": {
+      "type": "string",
+      "default": "claude-opus-4-8",
+      "title": "Model",
+      "description": "Model ID. Plain name for anthropic (e.g. `claude-opus-4-8`); cross-region inference profile for bedrock (e.g. `us.anthropic.claude-opus-4-8`)."
+    },
+    "awsRegion": {
+      "type": "string",
+      "default": "us-east-1",
+      "title": "AWS region",
+      "description": "AWS region for the Bedrock backend. Ignored when backend is `anthropic`."
+    },
+    "systemPrompt": {
+      "type": "string",
+      "default": "You are a helpful assistant collaborating with a data scientist inside a JupyterLab notebook.",
+      "title": "System prompt",
+      "description": "System prompt sent to Claude on every conversation."
+    },
+    "permissionMode": {
+      "type": "string",
+      "enum": ["default", "acceptEdits", "plan", "bypassPermissions"],
+      "default": "default",
+      "title": "Permission mode",
+      "description": "How Claude asks for confirmation before using tools. `bypassPermissions` disables all checks (unsafe)."
+    }
+  },
   "additionalProperties": false
 }
