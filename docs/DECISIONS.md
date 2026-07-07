@@ -104,3 +104,18 @@ Rationale: ExtensionApp is the future-proof path (matches jupyter-ai); per-WS SD
 Category: cleanup
 Fixed remaining `myextension@dc-ks/jupyter-claude` references in `jupyter_claude/__init__.py`, `src/index.ts`, `src/__tests__/jupyter_claude.spec.ts`, `ui-tests/tests/jupyter_claude.spec.ts`, `CONTRIBUTING.md`. The earlier fix in Step 1 only covered JSON/YAML/TOML; missed Python/TS/MD.
 Rationale: leftover refs would break plugin ID matching in the frontend activate hook and integration tests.
+
+## [2026-07-07 12:45] Frontend built (Step 3)
+Category: architecture
+Added `src/ws.ts` (typed WebSocket client with auto-reconnect and message-queue buffering), `src/panel.tsx` (React chat UI wrapped in a `ReactWidget`, plain scrolling message list + textarea input; message roles rendered as user/assistant/tool/system), `src/commands.ts` (four commands: `jclaude:open-chat`, `jclaude:generate-cell`, `jclaude:explain-cell`, `jclaude:fix-last-error`; command palette entries + cell context-menu entries; `NotebookActions.executed` capture stores last error per notebook). `src/index.ts` requires `INotebookTracker` and `ILabShell`, activates on app.restored and attaches the panel to the right sidebar. `schema/plugin.json` adds `jupyter.lab.toolbars` entries for a Cell-toolbar "Explain" button and a Notebook-toolbar "Open Chat" button. `style/base.css` styles the panel using JupyterLab CSS variables so it themes with light/dark.
+Rationale: matches the plan (right-side panel, four v1 commands). Simple message list, no `@jupyter/chat` dependency, no Yjs — deferred per plan.
+
+## [2026-07-07 12:45] React 18 pinned; tsconfig moduleResolution=bundler
+Category: dependency
+`jlpm add react react-dom` initially pulled React 19.2.7, which broke type-compat with `@jupyterlab/apputils`'s bundled `@types/react` 18.x — `ReactWidget.render()` returns `ReactRenderElement | null`, incompatible with React 19's `ReactElement`. Pinned to `react@^18.2.0` and `react-dom@^18.2.0` (both runtime and types). Separately, `tsconfig.json` `moduleResolution` was `node`, which couldn't resolve `vscode-languageserver-protocol` from `@jupyterlab/lsp`. Switched to `moduleResolution: bundler` (with `module: esnext`) — JupyterLab 4's current recommendation. `node16` was too strict (ESM/CJS interop errors from `@jupyter/ydoc`).
+Rationale: forced by JupyterLab 4's typings. Pin now, revisit when JupyterLab bundles React 19.
+
+## [2026-07-07 12:45] Frontend cell-write path: MCP tool calls, not local insertion
+Category: architecture
+For the three cell-manipulating commands (generate/explain/fix), the frontend sends a prompt to Claude with an explicit instruction to use `mcp__jupyter__insert_execute_code_cell` (or `insert_cell` + `execute_cell`). Claude writes to the notebook via the Jupyter MCP server; the frontend does not parse fenced code blocks itself. This is the opposite of what the earlier PLAN.md draft suggested (simple path = frontend parses text).
+Rationale: cleaner separation. Claude sees the exact notebook state via `read_notebook` and writes back through the same MCP surface, so cell positions and outputs stay consistent. Frontend stays simple — it just streams chat.

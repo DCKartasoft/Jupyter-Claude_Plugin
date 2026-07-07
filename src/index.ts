@@ -1,43 +1,60 @@
 import {
+  ILabShell,
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
-
+import { ICommandPalette } from '@jupyterlab/apputils';
+import { INotebookTracker } from '@jupyterlab/notebook';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 
-import { requestAPI } from './request';
+import { CommandIDs, registerCommands } from './commands';
+import { ChatPanelWidget } from './panel';
+import { ChatClient } from './ws';
 
-/**
- * Initialization data for the @dckartasoft/jupyter-claude extension.
- */
+const PLUGIN_ID = '@dckartasoft/jupyter-claude:plugin';
+
 const plugin: JupyterFrontEndPlugin<void> = {
-  id: '@dckartasoft/jupyter-claude:plugin',
-  description: 'Collaborate with Claude on Jupyter notebook code and documentation',
+  id: PLUGIN_ID,
+  description:
+    'Collaborate with Claude on Jupyter notebook code and documentation',
   autoStart: true,
-  optional: [ISettingRegistry],
-  activate: (app: JupyterFrontEnd, settingRegistry: ISettingRegistry | null) => {
-    console.log('JupyterLab extension @dckartasoft/jupyter-claude is activated!');
+  requires: [INotebookTracker, ILabShell],
+  optional: [ISettingRegistry, ICommandPalette],
+  activate: (
+    app: JupyterFrontEnd,
+    tracker: INotebookTracker,
+    labShell: ILabShell,
+    settingRegistry: ISettingRegistry | null,
+    palette: ICommandPalette | null
+  ) => {
+    console.log(`JupyterLab extension ${PLUGIN_ID} is activated!`);
 
     if (settingRegistry) {
       settingRegistry
-        .load(plugin.id)
+        .load(PLUGIN_ID)
         .then(settings => {
-          console.log('@dckartasoft/jupyter-claude settings loaded:', settings.composite);
+          console.log(`${PLUGIN_ID} settings loaded:`, settings.composite);
         })
         .catch(reason => {
-          console.error('Failed to load settings for @dckartasoft/jupyter-claude.', reason);
+          console.error(`Failed to load settings for ${PLUGIN_ID}.`, reason);
         });
     }
 
-    requestAPI<any>('hello', app.serviceManager.serverSettings)
-      .then(data => {
-        console.log(data);
-      })
-      .catch(reason => {
-        console.error(
-          `The jupyter_claude server extension appears to be missing.\n${reason}`
-        );
-      });
+    const client = new ChatClient();
+    const chatPanel = new ChatPanelWidget(client);
+
+    registerCommands(app, tracker, labShell, palette, chatPanel);
+
+    app.restored.then(() => {
+      if (!chatPanel.isAttached) {
+        labShell.add(chatPanel, 'right', { rank: 900 });
+      }
+    });
+
+    console.log(
+      `${PLUGIN_ID} commands registered:`,
+      Object.values(CommandIDs)
+    );
   }
 };
 

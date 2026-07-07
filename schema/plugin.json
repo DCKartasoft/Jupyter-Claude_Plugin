@@ -1,5 +1,21 @@
 {
   "jupyter.lab.shortcuts": [],
+  "jupyter.lab.toolbars": {
+    "Cell": [
+      {
+        "name": "jclaude-explain",
+        "command": "jclaude:explain-cell",
+        "rank": 60
+      }
+    ],
+    "Notebook": [
+      {
+        "name": "jclaude-open-chat",
+        "command": "jclaude:open-chat",
+        "rank": 60
+      }
+    ]
+  },
   "title": "Jupyter Claude",
   "description": "Settings for the Jupyter Claude collaboration extension.",
   "type": "object",

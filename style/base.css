@@ -3,3 +3,98 @@
 
     https://jupyterlab.readthedocs.io/en/stable/developer/css.html
 */
+
+.jclaude-panel-widget {
+  min-width: 300px;
+  background: var(--jp-layout-color1);
+}
+
+.jclaude-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  color: var(--jp-ui-font-color1);
+  font-family: var(--jp-ui-font-family);
+  font-size: var(--jp-ui-font-size1);
+}
+
+.jclaude-messages {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.jclaude-msg {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--jp-layout-color2);
+}
+
+.jclaude-msg-user {
+  background: var(--jp-brand-color3);
+  color: var(--jp-inverse-layout-color1);
+}
+
+.jclaude-msg-assistant {
+  background: var(--jp-layout-color2);
+}
+
+.jclaude-msg-tool {
+  background: var(--jp-layout-color0);
+  font-family: var(--jp-code-font-family);
+  font-size: var(--jp-code-font-size);
+}
+
+.jclaude-msg-system {
+  background: transparent;
+  color: var(--jp-ui-font-color2);
+  font-style: italic;
+  font-size: var(--jp-ui-font-size0);
+}
+
+.jclaude-msg-role {
+  font-size: var(--jp-ui-font-size0);
+  text-transform: uppercase;
+  color: var(--jp-ui-font-color2);
+  margin-bottom: 2px;
+}
+
+.jclaude-msg-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.jclaude-input-row {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-top: 1px solid var(--jp-border-color2);
+}
+
+.jclaude-input {
+  flex: 1 1 auto;
+  resize: vertical;
+  padding: 6px;
+  background: var(--jp-layout-color0);
+  color: var(--jp-ui-font-color1);
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 3px;
+  font-family: var(--jp-ui-font-family);
+  font-size: var(--jp-ui-font-size1);
+}
+
+.jclaude-send {
+  align-self: flex-end;
+  padding: 6px 12px;
+  background: var(--jp-brand-color1);
+  color: var(--jp-inverse-layout-color1);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.jclaude-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
