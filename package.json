@@ -1,11 +1,16 @@
 {
     "name": "@dckartasoft/jupyter-claude",
-    "version": "0.1.0",
+    "version": "0.1.0-alpha.1",
     "description": "Collaborate with Claude on Jupyter notebook code and documentation",
     "keywords": [
         "jupyter",
         "jupyterlab",
-        "jupyterlab-extension"
+        "jupyterlab-extension",
+        "claude",
+        "anthropic",
+        "bedrock",
+        "ai",
+        "llm"
     ],
     "homepage": "https://github.com/DCKartasoft/Jupyter-Claude_Plugin",
     "bugs": {

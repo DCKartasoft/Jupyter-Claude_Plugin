@@ -24,25 +24,27 @@ A JupyterLab extension enabling collaborative development between users and Clau
 - Python >= 3.10 (this project targets 3.13)
 - `uv` package manager (via Homebrew: `brew install uv`)
 
-## Development install
+## Install (from PyPI, recommended)
+
+```bash
+pip install --pre jupyter-claude-plugin
+```
+
+`--pre` is required until the first stable release. Runtime dependencies (`claude-agent-sdk`, `jupyter-mcp-server`, `jupyter-collaboration`) are pulled in automatically. See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for backend configuration and usage.
+
+## Development install (from source)
 
 ```bash
 cd /path/to/Jupyter-Claude_Plugin
 uv venv
 source .venv/bin/activate
 
-# Frontend deps
 jlpm install
-
-# Python deps (editable install)
 uv pip install -e ".[dev,test]"
-uv pip install jupyter-mcp-server jupyter-collaboration claude-agent-sdk
-
-# Link the labextension into the running JupyterLab dev build
+jlpm build
 jupyter labextension develop . --overwrite
 jupyter server extension enable jupyter_claude
 
-# Start JupyterLab
 jupyter lab
 ```
 

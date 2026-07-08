@@ -41,38 +41,42 @@ Install and use the Jupyter Claude extension in your own JupyterLab environment.
 
 ## Install
 
-Until a wheel is published to PyPI, install from source. The recommended tool is `uv` (`brew install uv`), but plain `pip` and `venv` work too.
+### Recommended: from PyPI
+
+The extension is published to PyPI as `jupyter-claude-plugin`. Runtime dependencies (`claude-agent-sdk`, `jupyter-mcp-server`, `jupyter-collaboration`) are pulled in automatically.
+
+Because the initial release is an alpha, you need `--pre` to install it:
 
 ```bash
-git clone https://github.com/DCKartasoft/Jupyter-Claude_Plugin.git
-cd Jupyter-Claude_Plugin
+pip install --pre jupyter-claude-plugin
+```
 
-# Create/activate a virtualenv
-uv venv
-source .venv/bin/activate
+Or with `uv`:
 
-# Python deps (editable install of the extension)
-uv pip install -e ".[dev,test]"
-
-# Runtime deps: Claude Agent SDK + Jupyter MCP server
-uv pip install jupyter-mcp-server jupyter-collaboration claude-agent-sdk
-
-# Frontend deps + build
-jlpm install
-jlpm build
-
-# Symlink the built labextension into JupyterLab's discovery path
-jupyter labextension develop . --overwrite
-
-# Enable the server extension (usually automatic, but confirm)
-jupyter server extension enable jupyter_claude
+```bash
+uv pip install --prerelease=allow jupyter-claude-plugin
 ```
 
 Verify:
 
 ```bash
 jupyter server extension list      # jupyter_claude, jupyter_mcp_server, jupyter_mcp_tools all "OK"
-jupyter labextension list          # @dckartasoft/jupyter-claude v0.1.0 enabled OK
+jupyter labextension list          # @dckartasoft/jupyter-claude enabled OK
+```
+
+### From source (for hacking on the extension)
+
+Requires Node ≥ 20 for the frontend build. See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full dev workflow, or the short form:
+
+```bash
+git clone https://github.com/DCKartasoft/Jupyter-Claude_Plugin.git
+cd Jupyter-Claude_Plugin
+
+uv venv && source .venv/bin/activate
+uv pip install -e ".[dev,test]"
+jlpm install && jlpm build
+jupyter labextension develop . --overwrite
+jupyter server extension enable jupyter_claude
 ```
 
 ## Configure a backend
@@ -249,18 +253,8 @@ if ! command -v node >/dev/null || [ "$(node --version | cut -d. -f1 | tr -d v)"
 fi
 sudo npm install -g @anthropic-ai/claude-code
 
-# --- Python runtime deps ---
-pip install jupyter-mcp-server jupyter-collaboration claude-agent-sdk
-
-# --- Extension (from source; swap for a wheel when one is published) ---
-cd ~
-git clone https://github.com/DCKartasoft/Jupyter-Claude_Plugin.git
-cd Jupyter-Claude_Plugin
-pip install -e ".[dev,test]"
-jlpm install
-jlpm build
-jupyter labextension develop . --overwrite
-jupyter server extension enable jupyter_claude
+# --- Extension (from PyPI; pulls in claude-agent-sdk, jupyter-mcp-server, jupyter-collaboration) ---
+pip install --pre jupyter-claude-plugin
 
 # --- Server config: use IAM role, not a named profile ---
 mkdir -p ~/.jupyter
@@ -280,7 +274,7 @@ EOF
 
 - **`aws_profile` must be empty.** Named profiles look up `~/.aws/credentials`, which the SageMaker execution role doesn't populate. Leave the trait blank so the standard AWS credential chain finds the instance metadata.
 - **`~/.claude.json` won't exist** on a fresh space, so the "MCP servers…" picker shows only `jupyter`. That's fine — Jupyter MCP is all you need for cell R/W/execute. If you want additional MCP servers, run `claude mcp add --scope user <name> -- <cmd>` inside the space.
-- **`jupyter labextension develop` links live in the conda env, not the user home.** In SageMaker Studio those environments are ephemeral — the extension link is lost when the space restarts unless the lifecycle script re-runs. Either (a) put the setup script in a lifecycle config, or (b) build a custom Studio image with the extension baked in.
+- **Studio environments are ephemeral.** Pip installs into the space's Python env don't survive restarts unless persisted. Put the `pip install --pre jupyter-claude-plugin` line in a lifecycle configuration so it re-runs on each space startup, or bake the extension into a custom Studio image for zero-latency startup.
 - **Bedrock model IDs are region-specific.** The defaults in `config.py` target `us-east-1`. In other regions, look up the correct inference-profile IDs with `aws bedrock list-inference-profiles --region <your-region>` and override the three `default_*_model` traits.
 - **Egress:** Bedrock is reached via AWS-internal endpoints, so no VPC egress rules to loosen. This is one advantage over Anthropic direct on SageMaker.
 
