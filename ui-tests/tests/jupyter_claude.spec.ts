@@ -18,7 +18,8 @@ test('should emit an activation console message', async ({ page }) => {
   expect(
     logs.filter(
       s =>
-        s === 'JupyterLab extension @dckartasoft/jupyter-claude is activated!'
+        s ===
+        'JupyterLab extension @dckartasoft/jupyter-claude:plugin is activated!'
     )
   ).toHaveLength(1);
 });
