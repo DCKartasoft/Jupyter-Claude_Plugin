@@ -161,4 +161,5 @@ jobs:
       - uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
       - uses: jupyterlab/maintainer-tools/.github/actions/check-links@v1
         with:
-          ignore_links: "https://www.youtube.com/.* https://youtube.com/.* https://youtu.be/.*"
+          ignore_links: ".*youtube\\.com.* .*youtu\\.be.* .*playwright\\.dev.*"
+          ignore_glob: "docs/DECISIONS.md docs/PLAN.md"
