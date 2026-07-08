@@ -26,7 +26,7 @@
 - Fixed malformed `labextension_name` (`myextension@dc-ks/jupyter-claude` → `@dckartasoft/jupyter-claude`) across all config and code files.
 - Root `CHANGELOG.md` is now the single changelog; `docs/CHANGELOG.md` removed.
 - Initial commit landed (root `6e4db50`): plan, decisions, doc-keeper cron config, uv boilerplate, stub.
-- Haiku doc-keeper cron: every 10 minutes reads `docs/DECISIONS.md` and syncs `PLAN.md`, `README.md`, `CHANGELOG.md`, `Architecture.md`.
+- Haiku doc-keeper cron: hourly at `:03` past the hour, reads `docs/DECISIONS.md` and syncs `PLAN.md`, `README.md`, `CHANGELOG.md`, `Architecture.md`.
 - Corrected MCP server registration: `fetch` and `git` are Python packages; use `uvx` not `npx`.
 - Plan location: dual (`~/.claude/plans/...` internal + `docs/PLAN.md` versioned).
 - Dev environment locked to Homebrew + `uv` (no pipx); `uvx` replaces pipx for one-shot tools.
@@ -37,6 +37,6 @@
 - Four v1 interactions: chat about notebook, generate cell, explain/document cell, fix last error.
 - Project initialized (2026-07-07).
 
-_This changelog is maintained by an automated doc-keeper — it re-writes from [docs/DECISIONS.md](docs/DECISIONS.md) every 10 minutes._
+_This changelog is maintained by an automated doc-keeper — it re-writes from [docs/DECISIONS.md](docs/DECISIONS.md) every hour._
 
 <!-- <END NEW CHANGELOG ENTRY> -->

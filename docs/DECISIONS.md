@@ -1,6 +1,6 @@
 # Decisions Journal
 
-Append-only log of development decisions. The Haiku doc-keeper (see `.claude/scheduled_tasks.json`) reads this file every 10 minutes and updates `PLAN.md`, `README.md`, `CHANGELOG.md`, and `Architecture.md` to stay in sync.
+Append-only log of development decisions. The Haiku doc-keeper (see `.claude/scheduled_tasks.json`) reads this file every hour and updates `PLAN.md`, `README.md`, `CHANGELOG.md`, and `Architecture.md` to stay in sync.
 
 **Format for new entries:**
 
@@ -78,7 +78,7 @@ Rationale: user's dev environment is brew + uv. `pipx` isn't installed and `uvx`
 ## [2026-07-07 11:15] Haiku doc-keeper cron
 
 Category: process
-Haiku 4.5 agent runs every 10 minutes (durable, persists across sessions) reading `docs/DECISIONS.md` and updating `docs/PLAN.md`, `README.md`, `docs/CHANGELOG.md`, and `docs/Architecture.md` to reflect the current state.
+Haiku 4.5 agent runs every hour at `:03` past the hour (durable, persists across sessions) reading `docs/DECISIONS.md` and updating `docs/PLAN.md`, `README.md`, `docs/CHANGELOG.md`, and `docs/Architecture.md` to reflect the current state.
 Rationale: user wants documentation to stay in sync automatically without manual intervention. Haiku is cheap and fast enough for this maintenance work.
 
 ## [2026-07-07 11:40] Initial commit landed (6e4db50)

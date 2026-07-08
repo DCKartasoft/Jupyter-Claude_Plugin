@@ -28,7 +28,7 @@ A JupyterLab extension enabling collaborative development between users and Clau
 pip install --pre jupyter-claude-plugin
 ```
 
-`--pre` is required for alpha releases. Runtime dependencies (`claude-agent-sdk`, `jupyter-mcp-server`, `jupyter-collaboration`) are pulled in automatically. See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for backend configuration and usage.
+`--pre` is required for alpha releases (currently `0.1.0a1`). Runtime dependencies (`claude-agent-sdk`, `jupyter-mcp-server`, `jupyter-collaboration`) are pulled in automatically. See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for backend configuration and usage.
 
 ## Development install (from source)
 
@@ -128,4 +128,4 @@ jupyter labextension list
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-_This README is maintained by an automated doc-keeper — it re-writes from [docs/DECISIONS.md](docs/DECISIONS.md) every 10 minutes._
+_This README is maintained by an automated doc-keeper — it re-writes from [docs/DECISIONS.md](docs/DECISIONS.md) every hour._
