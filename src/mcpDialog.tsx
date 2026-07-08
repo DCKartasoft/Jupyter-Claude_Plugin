@@ -3,19 +3,19 @@ import { URLExt } from '@jupyterlab/coreutils';
 import { ServerConnection } from '@jupyterlab/services';
 import React, { useState } from 'react';
 
-export interface McpServerInfo {
+export interface IMcpServerInfo {
   name: string;
   description: string;
   enabled: boolean;
   required: boolean;
 }
 
-async function fetchServers(): Promise<McpServerInfo[]> {
+async function fetchServers(): Promise<IMcpServerInfo[]> {
   const settings = ServerConnection.makeSettings();
   const url = URLExt.join(settings.baseUrl, 'jupyter-claude', 'mcp-servers');
   const res = await ServerConnection.makeRequest(url, {}, settings);
   if (!res.ok) throw new Error(`GET mcp-servers: ${res.status}`);
-  const data = (await res.json()) as { servers: McpServerInfo[] };
+  const data = (await res.json()) as { servers: IMcpServerInfo[] };
   return data.servers;
 }
 
@@ -36,7 +36,7 @@ async function saveServers(enabled: string[]): Promise<string[]> {
 }
 
 function McpChecklist(props: {
-  servers: McpServerInfo[];
+  servers: IMcpServerInfo[];
   onChange: (enabled: string[]) => void;
 }): JSX.Element {
   const [selection, setSelection] = useState<Set<string>>(
@@ -82,7 +82,7 @@ function McpChecklist(props: {
 class McpChecklistBody extends ReactWidget {
   selection: string[];
 
-  constructor(private readonly servers: McpServerInfo[]) {
+  constructor(private readonly servers: IMcpServerInfo[]) {
     super();
     this.selection = servers.filter(s => s.enabled).map(s => s.name);
     this.addClass('jclaude-mcp-dialog');
@@ -110,10 +110,7 @@ export async function pickMcpServers(): Promise<string[] | null> {
   const result = await showDialog<string[]>({
     title: 'MCP servers',
     body,
-    buttons: [
-      Dialog.cancelButton(),
-      Dialog.okButton({ label: 'Apply' })
-    ]
+    buttons: [Dialog.cancelButton(), Dialog.okButton({ label: 'Apply' })]
   });
   if (!result.button.accept) return null;
   const enabled = await saveServers(body.getValue());

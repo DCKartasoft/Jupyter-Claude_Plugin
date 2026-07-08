@@ -62,6 +62,7 @@ The server extension reads `enabled_mcp_servers` trait (list of server names ena
 ## MCP tool usage
 
 Claude reads / writes / executes cells via `mcp__jupyter__*` tools provided by `jupyter-mcp-server`:
+
 - `read_notebook` — current notebook state
 - `read_cell` — single cell source
 - `insert_cell`, `insert_execute_code_cell` — add new cell (with or without auto-execution)

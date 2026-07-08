@@ -53,10 +53,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
       restorer.add(chatPanel, chatPanel.id);
     }
 
-    console.log(
-      `${PLUGIN_ID} commands registered:`,
-      Object.values(CommandIDs)
-    );
+    console.log(`${PLUGIN_ID} commands registered:`, Object.values(CommandIDs));
   }
 };
 

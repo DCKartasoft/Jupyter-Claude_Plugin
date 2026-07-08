@@ -144,16 +144,16 @@ Open a notebook, click the Claude tab in the right sidebar, and type a question.
 
 Example prompts:
 
-- *"What does this notebook do?"*
-- *"The DataFrame in cell 3 has a weird schema — what's going on?"*
-- *"Add a docstring to the function in the currently selected cell."*
+- _"What does this notebook do?"_
+- _"The DataFrame in cell 3 has a weird schema — what's going on?"_
+- _"Add a docstring to the function in the currently selected cell."_
 
 ### Generate a cell
 
 **Command palette (`⌘⇧C`) → "Generate cell with Claude…"** or the ★ toolbar button on the notebook.
 
 1. Pick the cell type — `code`, `markdown`, or `raw`.
-2. Describe what you want (e.g. *"load iris.csv into a pandas DataFrame and show df.head()"*).
+2. Describe what you want (e.g. _"load iris.csv into a pandas DataFrame and show df.head()"_).
 3. Claude inserts the cell into the current notebook. For `code` cells, it also executes them.
 
 ### Explain a cell
@@ -164,7 +164,7 @@ Right-click any code cell → **"Explain this cell with Claude"**. Claude insert
 
 Run a cell that raises (e.g. `1/0`). Then invoke **"Fix last error with Claude"** from the palette or the notebook toolbar. Claude sees the source of the failed cell, the exception name/value, and the traceback, and inserts a corrected version below.
 
-If the command reports "No recent cell error captured", make sure you actually ran a cell that errored *in this notebook tab* — the tracker keys errors per notebook.
+If the command reports "No recent cell error captured", make sure you actually ran a cell that errored _in this notebook tab_ — the tracker keys errors per notebook.
 
 ### Choose which MCP servers Claude may use
 
@@ -180,21 +180,21 @@ Use the dropdown in the chat panel header (Opus / Sonnet / Haiku). Switching tea
 
 Every setting is a trait on `ClaudeExtensionApp` and configurable via `jupyter_server_config.py`, the JupyterLab Settings Editor, or a `--ClaudeExtensionApp.<name>=<value>` CLI flag.
 
-| Trait | Type | Default | Notes |
-|---|---|---|---|
-| `backend` | `"anthropic"` \| `"bedrock"` | `"anthropic"` | Which API to talk to |
-| `model` | str | `"claude-opus-4-8"` | Anthropic-direct only; unused for Bedrock |
-| `aws_region` | str | `"us-east-1"` | Bedrock region |
-| `aws_profile` | str | `""` | Named profile from `~/.aws/config`; empty = use process env |
-| `default_opus_model` | str | `"us.anthropic.claude-opus-4-7"` | Bedrock inference profile |
-| `default_sonnet_model` | str | `"us.anthropic.claude-sonnet-4-6"` | Bedrock inference profile |
-| `default_haiku_model` | str | `"us.anthropic.claude-haiku-4-5-20251001-v1:0"` | Bedrock inference profile |
-| `main_model_tier` | `"opus"` \| `"sonnet"` \| `"haiku"` | `"sonnet"` | Default tier when the panel first opens |
-| `system_prompt` | str | see `config.py` | Prepended to every conversation |
-| `permission_mode` | `"default"` \| `"acceptEdits"` \| `"plan"` \| `"bypassPermissions"` | `"default"` | `acceptEdits` skips confirmation dialogs when Claude uses MCP tools; `bypassPermissions` is dangerous |
-| `enabled_mcp_servers` | list[str] | `["jupyter"]` | Which MCP servers Claude may call. `jupyter` is always forced-included |
-| `jupyter_mcp_url` | str | `""` | Empty = auto-detect from Jupyter's port |
-| `verbose` | bool | `False` | Log every SDK message at INFO |
+| Trait                  | Type                                                                | Default                                         | Notes                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `backend`              | `"anthropic"` \| `"bedrock"`                                        | `"anthropic"`                                   | Which API to talk to                                                                                  |
+| `model`                | str                                                                 | `"claude-opus-4-8"`                             | Anthropic-direct only; unused for Bedrock                                                             |
+| `aws_region`           | str                                                                 | `"us-east-1"`                                   | Bedrock region                                                                                        |
+| `aws_profile`          | str                                                                 | `""`                                            | Named profile from `~/.aws/config`; empty = use process env                                           |
+| `default_opus_model`   | str                                                                 | `"us.anthropic.claude-opus-4-7"`                | Bedrock inference profile                                                                             |
+| `default_sonnet_model` | str                                                                 | `"us.anthropic.claude-sonnet-4-6"`              | Bedrock inference profile                                                                             |
+| `default_haiku_model`  | str                                                                 | `"us.anthropic.claude-haiku-4-5-20251001-v1:0"` | Bedrock inference profile                                                                             |
+| `main_model_tier`      | `"opus"` \| `"sonnet"` \| `"haiku"`                                 | `"sonnet"`                                      | Default tier when the panel first opens                                                               |
+| `system_prompt`        | str                                                                 | see `config.py`                                 | Prepended to every conversation                                                                       |
+| `permission_mode`      | `"default"` \| `"acceptEdits"` \| `"plan"` \| `"bypassPermissions"` | `"default"`                                     | `acceptEdits` skips confirmation dialogs when Claude uses MCP tools; `bypassPermissions` is dangerous |
+| `enabled_mcp_servers`  | list[str]                                                           | `["jupyter"]`                                   | Which MCP servers Claude may call. `jupyter` is always forced-included                                |
+| `jupyter_mcp_url`      | str                                                                 | `""`                                            | Empty = auto-detect from Jupyter's port                                                               |
+| `verbose`              | bool                                                                | `False`                                         | Log every SDK message at INFO                                                                         |
 
 ## Running on AWS SageMaker
 
@@ -202,11 +202,11 @@ The extension is a standard pip-installable JupyterLab 4 extension, so it runs o
 
 ### Which SageMaker environment?
 
-| Environment | JupyterLab version | Verdict |
-|---|---|---|
-| **SageMaker Studio (JupyterLab 4)** | 4.x | Supported — best fit. |
-| SageMaker Studio Classic | 3.x | Not supported without a JupyterLab-3 port; we pin to JupyterLab 4 APIs. |
-| SageMaker Notebook Instances | Varies by AMI (often 3.x) | Check `jupyter lab --version`. If < 4, upgrade the environment or skip. |
+| Environment                         | JupyterLab version        | Verdict                                                                 |
+| ----------------------------------- | ------------------------- | ----------------------------------------------------------------------- |
+| **SageMaker Studio (JupyterLab 4)** | 4.x                       | Supported — best fit.                                                   |
+| SageMaker Studio Classic            | 3.x                       | Not supported without a JupyterLab-3 port; we pin to JupyterLab 4 APIs. |
+| SageMaker Notebook Instances        | Varies by AMI (often 3.x) | Check `jupyter lab --version`. If < 4, upgrade the environment or skip. |
 
 Run `jupyter lab --version` in a terminal inside your SageMaker space to confirm.
 

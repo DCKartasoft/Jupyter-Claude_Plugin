@@ -27,14 +27,14 @@ export const CommandIDs = {
   mcpServers: 'jclaude:mcp-servers'
 };
 
-interface LastError {
+interface ILastError {
   cellSource: string;
   errorName: string;
   errorValue: string;
   traceback: string[];
 }
 
-const lastErrors = new Map<string, LastError>();
+const lastErrors = new Map<string, ILastError>();
 
 function activeCell(tracker: INotebookTracker): {
   panel: NotebookPanel;
@@ -137,7 +137,8 @@ export function registerCommands(
 
       const placeholders: Record<typeof cellType, string> = {
         code: 'e.g. load iris.csv into a pandas DataFrame and show df.head()',
-        markdown: 'e.g. an intro section titled "Data loading" describing the next few cells',
+        markdown:
+          'e.g. an intro section titled "Data loading" describing the next few cells',
         raw: 'e.g. an nbconvert-only LaTeX preamble block'
       };
       const description = await InputDialog.getText({
@@ -211,7 +212,9 @@ export function registerCommands(
         if (enabled === null) return;
         chatClient.reloadMcp();
         revealChat(chatPanel, labShell);
-        console.log(`jupyter-claude: enabled MCP servers = ${enabled.join(', ')}`);
+        console.log(
+          `jupyter-claude: enabled MCP servers = ${enabled.join(', ')}`
+        );
       } catch (err) {
         console.error('jupyter-claude MCP dialog failed', err);
       }

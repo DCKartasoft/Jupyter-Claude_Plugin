@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { claudeIcon } from './icons';
 import { ChatClient, ServerMessage } from './ws';
 
-interface DisplayMessage {
+interface IDisplayMessage {
   role: 'user' | 'assistant' | 'system' | 'tool';
   text: string;
   id: string;
@@ -15,13 +15,13 @@ const nextId = (): string => `m${++_idSeed}`;
 
 const TIERS: Array<'opus' | 'sonnet' | 'haiku'> = ['opus', 'sonnet', 'haiku'];
 
-interface ChatUIProps {
+interface IChatUIProps {
   client: ChatClient;
   registerSubmit: (fn: (text: string) => void) => void;
 }
 
-function ChatUI(props: ChatUIProps): JSX.Element {
-  const [messages, setMessages] = useState<DisplayMessage[]>([]);
+function ChatUI(props: IChatUIProps): JSX.Element {
+  const [messages, setMessages] = useState<IDisplayMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [tier, setTier] = useState<'opus' | 'sonnet' | 'haiku'>('sonnet');
@@ -46,10 +46,7 @@ function ChatUI(props: ChatUIProps): JSX.Element {
               }
             ];
           case 'assistant_text':
-            return [
-              ...prev,
-              { role: 'assistant', text: m.text, id: nextId() }
-            ];
+            return [...prev, { role: 'assistant', text: m.text, id: nextId() }];
           case 'tool_use':
             return [
               ...prev,

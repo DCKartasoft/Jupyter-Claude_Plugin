@@ -77,7 +77,7 @@ Prereq: Node ≥ 20 (`brew install node`) — the copier template's build (`jlpm
 
 ## Step 2 — Server extension (Python)
 
-**Files:** [jupyter_claude/handlers.py], [jupyter_claude/agent.py] (new), [jupyter_claude/config.py] (new), [jupyter_claude/mcp_discovery.py] (new), [jupyter_claude/__init__.py].
+**Files:** [jupyter_claude/handlers.py], [jupyter_claude/agent.py] (new), [jupyter_claude/config.py] (new), [jupyter_claude/mcp_discovery.py] (new), [jupyter_claude/**init**.py].
 
 - `config.py` — a `jupyter_server.extension.application.ExtensionApp` traitlets class exposing:
   - `backend: Enum("anthropic", "bedrock")`
@@ -151,22 +151,22 @@ For new users, add **docs/USER_GUIDE.md** — comprehensive install & operation 
 
 ## Critical files to touch
 
-| File | Purpose |
-|---|---|
-| [jupyter_claude/config.py] | Backend + model + AWS region + AWS profile + per-tier model IDs + enabled MCP servers traitlets |
-| [jupyter_claude/agent.py] | Build `ClaudeAgentOptions`, filter MCP servers by enabled list, tier overrides, SSO profile forwarding |
-| [jupyter_claude/mcp_discovery.py] | List user's registered MCP servers from `~/.claude.json` |
-| [jupyter_claude/handlers.py] | WS chat handler, REST MCP-servers endpoints, tier switching, per-connection client lifecycle |
-| [jupyter_claude/__init__.py] | Extension entrypoints |
-| [src/index.ts] | Plugin activate, tracker + shell wiring, layout restorer |
-| [src/commands.ts] | Five v1 commands + cell-error capture |
-| [src/panel.tsx] | React chat panel with tier selector + spinner + input textarea |
-| [src/mcpDialog.tsx] | MCP server selector dialog |
-| [src/ws.ts] | WS client with typed messages and auto-reconnect |
-| [src/icons.ts] | Custom `claudeIcon` SVG (blue spark, `#4361ee`) |
-| [schema/plugin.json] | Toolbar registration + settings schema + per-tier model traits |
-| [pyproject.toml] | Add `claude-agent-sdk`, `jupyter-mcp-server`, `jupyter-collaboration` |
-| [docs/USER_GUIDE.md] | User-facing operation manual (install, launch, commands, troubleshooting) |
+| File                              | Purpose                                                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| [jupyter_claude/config.py]        | Backend + model + AWS region + AWS profile + per-tier model IDs + enabled MCP servers traitlets        |
+| [jupyter_claude/agent.py]         | Build `ClaudeAgentOptions`, filter MCP servers by enabled list, tier overrides, SSO profile forwarding |
+| [jupyter_claude/mcp_discovery.py] | List user's registered MCP servers from `~/.claude.json`                                               |
+| [jupyter_claude/handlers.py]      | WS chat handler, REST MCP-servers endpoints, tier switching, per-connection client lifecycle           |
+| [jupyter_claude/**init**.py]      | Extension entrypoints                                                                                  |
+| [src/index.ts]                    | Plugin activate, tracker + shell wiring, layout restorer                                               |
+| [src/commands.ts]                 | Five v1 commands + cell-error capture                                                                  |
+| [src/panel.tsx]                   | React chat panel with tier selector + spinner + input textarea                                         |
+| [src/mcpDialog.tsx]               | MCP server selector dialog                                                                             |
+| [src/ws.ts]                       | WS client with typed messages and auto-reconnect                                                       |
+| [src/icons.ts]                    | Custom `claudeIcon` SVG (blue spark, `#4361ee`)                                                        |
+| [schema/plugin.json]              | Toolbar registration + settings schema + per-tier model traits                                         |
+| [pyproject.toml]                  | Add `claude-agent-sdk`, `jupyter-mcp-server`, `jupyter-collaboration`                                  |
+| [docs/USER_GUIDE.md]              | User-facing operation manual (install, launch, commands, troubleshooting)                              |
 
 ## Out of scope for v1
 

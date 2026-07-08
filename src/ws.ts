@@ -1,30 +1,30 @@
 import { URLExt } from '@jupyterlab/coreutils';
 import { ServerConnection } from '@jupyterlab/services';
 
-export interface AssistantTextMessage {
+export interface IAssistantTextMessage {
   type: 'assistant_text';
   text: string;
 }
 
-export interface ToolUseMessage {
+export interface IToolUseMessage {
   type: 'tool_use';
   id: string;
   name: string;
   input: unknown;
 }
 
-export interface SystemMessage {
+export interface ISystemMessage {
   type: 'system';
   subtype: string;
   data: unknown;
 }
 
-export interface UserEchoMessage {
+export interface IUserEchoMessage {
   type: 'user_echo';
   content: Array<{ type: string; text: string | null }>;
 }
 
-export interface ResultMessage {
+export interface IResultMessage {
   type: 'result';
   duration_ms: number;
   num_turns: number;
@@ -32,45 +32,43 @@ export interface ResultMessage {
   usage: unknown;
 }
 
-export interface ReadyMessage {
+export interface IReadyMessage {
   type: 'ready';
   backend: string;
   model: string;
 }
 
-export interface ErrorMessage {
+export interface IErrorMessage {
   type: 'error';
   message: string;
   traceback?: string;
 }
 
 export type ServerMessage =
-  | AssistantTextMessage
-  | ToolUseMessage
-  | SystemMessage
-  | UserEchoMessage
-  | ResultMessage
-  | ReadyMessage
-  | ErrorMessage;
+  | IAssistantTextMessage
+  | IToolUseMessage
+  | ISystemMessage
+  | IUserEchoMessage
+  | IResultMessage
+  | IReadyMessage
+  | IErrorMessage;
 
-export interface UserMessagePayload {
+export interface IUserMessagePayload {
   type: 'user_message';
   text: string;
 }
 
-export interface SetTierPayload {
+export interface ISetTierPayload {
   type: 'set_tier';
   tier: 'opus' | 'sonnet' | 'haiku';
 }
 
-export interface McpReloadPayload {
+export interface IMcpReloadPayload {
   type: 'mcp_reload';
 }
 
 export type ClientMessage =
-  | UserMessagePayload
-  | SetTierPayload
-  | McpReloadPayload;
+  IUserMessagePayload | ISetTierPayload | IMcpReloadPayload;
 
 export type MessageHandler = (msg: ServerMessage) => void;
 
@@ -85,11 +83,7 @@ export class ChatClient {
 
   connect(): void {
     this.closedByUser = false;
-    const wsUrl = URLExt.join(
-      this.settings.wsUrl,
-      'jupyter-claude',
-      'chat'
-    );
+    const wsUrl = URLExt.join(this.settings.wsUrl, 'jupyter-claude', 'chat');
     const withToken = this.settings.token
       ? `${wsUrl}?token=${encodeURIComponent(this.settings.token)}`
       : wsUrl;
