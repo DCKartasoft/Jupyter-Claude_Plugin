@@ -45,7 +45,7 @@ jobs:
         jupyter server extension list 2>&1 | grep -ie "jupyter_claude.*OK"
 
         jupyter labextension list
-        jupyter labextension list 2>&1 | grep -ie "myextension@dc-ks/jupyter-claude.*OK"
+        jupyter labextension list 2>&1 | grep -ie "@dckartasoft/jupyter-claude.*OK"
         python -m jupyterlab.browser_check
 
     - name: Package the extension
@@ -90,7 +90,7 @@ jobs:
         jupyter server extension list 2>&1 | grep -ie "jupyter_claude.*OK"
 
         jupyter labextension list
-        jupyter labextension list 2>&1 | grep -ie "myextension@dc-ks/jupyter-claude.*OK"
+        jupyter labextension list 2>&1 | grep -ie "@dckartasoft/jupyter-claude.*OK"
         python -m jupyterlab.browser_check --no-browser-test
 
   integration-tests:
