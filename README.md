@@ -1,7 +1,5 @@
 # Jupyter Claude Plugin
 
-[![Github Actions Status](https://github.com/DCKartasoft/Jupyter-Claude_Plugin/workflows/Build/badge.svg)](https://github.com/DCKartasoft/Jupyter-Claude_Plugin/actions/workflows/build.yml)
-
 A JupyterLab extension enabling collaborative development between users and Claude. Chat about your notebook, generate cells from prompts, explain and document existing code, and fix errors — all within JupyterLab.
 
 > **Status:** early development, scaffold phase complete. See [docs/PLAN.md](docs/PLAN.md) for the implementation plan and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
