@@ -64,7 +64,7 @@ fields = ["description", "authors", "keywords"]
 
 [tool.hatch.build.targets.sdist]
 artifacts = ["jupyter_claude/labextension"]
-exclude = [".github", "binder"]
+exclude = [".github", "binder", ".claude"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["jupyter_claude"]
