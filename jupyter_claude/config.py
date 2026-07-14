@@ -1,5 +1,5 @@
 from jupyter_server.extension.application import ExtensionApp
-from traitlets import Bool, Enum, List, Unicode
+from traitlets import Bool, Enum, Int, List, Unicode
 
 
 class ClaudeExtensionApp(ExtensionApp):
@@ -72,12 +72,47 @@ class ClaudeExtensionApp(ExtensionApp):
 
     system_prompt = Unicode(
         "You are a helpful assistant collaborating with a data scientist inside "
-        "a JupyterLab notebook. You can read, write, and execute notebook cells "
-        "through the Jupyter MCP tools available to you. Prefer small, "
-        "reversible steps. When generating code, explain the plan briefly first, "
-        "then produce a single fenced code block the user can drop into a cell.",
+        "a JupyterLab notebook.\n\n"
+        "You may have access to Jupyter MCP tools (`mcp__jupyter__*`) that can "
+        "read, write, and execute notebook cells. Use them ONLY when the user's "
+        "message clearly requires notebook access — e.g. they ask you to "
+        "insert / modify / execute a cell, or their question genuinely depends "
+        "on notebook state not already provided in the message.\n\n"
+        "IMPORTANT: user messages often include a `<notebook_snapshot>` block "
+        "with the current cell contents. When present, use it as your source "
+        "of truth for the notebook state and DO NOT call `read_notebook` or "
+        "`read_cell` — that snapshot already has what you need. Only call the "
+        "Jupyter tools when you need to *write* (insert / overwrite / execute) "
+        "a cell, or when the snapshot was explicitly marked truncated and you "
+        "need a specific cell that's missing.\n\n"
+        "For general questions, code snippets, explanations, or conversation, "
+        "respond directly with NO tool calls. Prefer small reversible steps. "
+        "When generating code, briefly explain the plan first, then either "
+        "produce a fenced code block or insert the cell directly via the "
+        "appropriate `mcp__jupyter__` tool if the user asked for insertion.",
         config=True,
-        help="System prompt sent to Claude on every conversation.",
+        help="System prompt sent to Claude on every conversation. The default "
+        "steers Claude toward using the `<notebook_snapshot>` shipped in each "
+        "user message and away from redundant `read_notebook`/`read_cell` MCP "
+        "calls, which noticeably improves chat latency.",
+    )
+
+    notebook_snapshot_max_cells = Int(
+        50,
+        config=True,
+        help="How many cells to include in the `<notebook_snapshot>` prefixed "
+        "to each user message. 0 disables snapshots entirely (Claude falls "
+        "back to read_notebook — slower). 50 (default) covers most notebooks. "
+        "Larger notebooks are truncated with a marker; Claude will call "
+        "`read_cell` for omitted cells only if the request needs them.",
+    )
+
+    notebook_snapshot_max_source_chars = Int(
+        2000,
+        config=True,
+        help="Per-cell character cap for source code in the notebook snapshot. "
+        "Cells longer than this are truncated with `…(N more chars)`. 0 "
+        "disables truncation.",
     )
 
     jupyter_mcp_url = Unicode(

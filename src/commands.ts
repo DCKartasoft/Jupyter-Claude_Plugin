@@ -16,6 +16,7 @@ import {
   mcpServersIcon
 } from './icons';
 import { pickMcpServers } from './mcpDialog';
+import { notebookPin } from './notebookContext';
 import { ChatPanelWidget } from './panel';
 import { getMultilineText } from './promptDialog';
 import { ChatClient } from './ws';
@@ -94,23 +95,6 @@ function revealChat(chatPanel: ChatPanelWidget, labShell: ILabShell): void {
     labShell.add(chatPanel, 'right', { rank: 900 });
   }
   labShell.activateById(chatPanel.id);
-}
-
-/**
- * Prefix that pins Claude to the currently-focused notebook. Prepended to every
- * command prompt so jupyter-mcp-server operates on the right file instead of
- * falling back to its "default" (`notebook.ipynb`).
- */
-function notebookPin(tracker: INotebookTracker): string {
-  const panel = tracker.currentWidget;
-  if (!panel) return '';
-  const path = panel.context.path;
-  return (
-    `The user's currently focused notebook is \`${path}\`. Before any ` +
-    `cell operation, call mcp__jupyter__use_notebook with notebook_name="${path}" ` +
-    `so subsequent read/insert/execute calls target that file. Do NOT operate ` +
-    `on any other notebook (do NOT default to notebook.ipynb).\n\n`
-  );
 }
 
 export function registerCommands(

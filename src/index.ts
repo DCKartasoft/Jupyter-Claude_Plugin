@@ -9,6 +9,7 @@ import { INotebookTracker } from '@jupyterlab/notebook';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 
 import { CommandIDs, registerCommands } from './commands';
+import { notebookPin } from './notebookContext';
 import { ChatPanelWidget } from './panel';
 import { ChatClient } from './ws';
 
@@ -45,18 +46,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
     const client = new ChatClient();
     const chatPanel = new ChatPanelWidget(client);
 
-    // Pin free-form chat messages to whichever notebook the user has focused,
-    // so jupyter-mcp-server doesn't default to notebook.ipynb.
-    chatPanel.setUserMessagePrefixProvider(() => {
-      const panel = tracker.currentWidget;
-      if (!panel) return '';
-      const path = panel.context.path;
-      return (
-        `The user's currently focused notebook is \`${path}\`. Before any ` +
-        `cell operation, call mcp__jupyter__use_notebook with notebook_name="${path}" ` +
-        `so read/insert/execute calls target that file (do NOT default to notebook.ipynb).\n\n`
-      );
-    });
+    // Pin free-form chat messages to whichever notebook the user has focused
+    // and ship a snapshot of its cells, so Claude can answer most questions
+    // without calling mcp__jupyter__read_notebook.
+    chatPanel.setUserMessagePrefixProvider(() => notebookPin(tracker));
 
     registerCommands(app, tracker, labShell, palette, chatPanel, client);
 
