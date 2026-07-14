@@ -130,6 +130,11 @@ dmypy.json
 # Claude Code
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
+.claude/skills/
+
+# Local scratch/test artifacts
+*.tif
+icons/*.zip
 
 # Jupyter runtime state
 .jupyter/

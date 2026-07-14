@@ -155,6 +155,30 @@
   min-width: 420px;
 }
 
+/* Multi-line prompt dialog (Generate cell). Sized ~half A5 landscape. */
+.jclaude-prompt-dialog {
+  min-width: 780px;
+}
+
+.jclaude-prompt-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 280px;
+  padding: 8px 10px;
+  background: var(--jp-layout-color0);
+  color: var(--jp-ui-font-color1);
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 3px;
+  font-family: var(--jp-ui-font-family);
+  font-size: var(--jp-ui-font-size1);
+  resize: vertical;
+}
+
+.jclaude-prompt-textarea:focus {
+  outline: none;
+  border-color: var(--jp-brand-color1);
+}
+
 .jclaude-mcp-hint {
   margin: 0 0 12px;
   color: var(--jp-ui-font-color2);

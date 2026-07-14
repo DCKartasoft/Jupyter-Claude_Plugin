@@ -7,16 +7,17 @@ import {
   NotebookActions,
   NotebookPanel
 } from '@jupyterlab/notebook';
-import {
-  addIcon,
-  bugIcon,
-  editIcon,
-  extensionIcon
-} from '@jupyterlab/ui-components';
 
-import { claudeIcon } from './icons';
+import {
+  claudeIcon,
+  correctCellIcon,
+  explainIcon,
+  generateCellIcon,
+  mcpServersIcon
+} from './icons';
 import { pickMcpServers } from './mcpDialog';
 import { ChatPanelWidget } from './panel';
+import { getMultilineText } from './promptDialog';
 import { ChatClient } from './ws';
 
 export const CommandIDs = {
@@ -95,6 +96,23 @@ function revealChat(chatPanel: ChatPanelWidget, labShell: ILabShell): void {
   labShell.activateById(chatPanel.id);
 }
 
+/**
+ * Prefix that pins Claude to the currently-focused notebook. Prepended to every
+ * command prompt so jupyter-mcp-server operates on the right file instead of
+ * falling back to its "default" (`notebook.ipynb`).
+ */
+function notebookPin(tracker: INotebookTracker): string {
+  const panel = tracker.currentWidget;
+  if (!panel) return '';
+  const path = panel.context.path;
+  return (
+    `The user's currently focused notebook is \`${path}\`. Before any ` +
+    `cell operation, call mcp__jupyter__use_notebook with notebook_name="${path}" ` +
+    `so subsequent read/insert/execute calls target that file. Do NOT operate ` +
+    `on any other notebook (do NOT default to notebook.ipynb).\n\n`
+  );
+}
+
 export function registerCommands(
   app: JupyterFrontEnd,
   tracker: INotebookTracker,
@@ -118,7 +136,7 @@ export function registerCommands(
   commands.addCommand(CommandIDs.generateCell, {
     label: 'Generate cell with Claude…',
     caption: 'Ask Claude to generate a new cell in the current notebook',
-    icon: addIcon,
+    icon: generateCellIcon,
     isEnabled: () => tracker.currentWidget !== null,
     execute: async () => {
       const panel = tracker.currentWidget;
@@ -141,21 +159,21 @@ export function registerCommands(
           'e.g. an intro section titled "Data loading" describing the next few cells',
         raw: 'e.g. an nbconvert-only LaTeX preamble block'
       };
-      const description = await InputDialog.getText({
+      const description = await getMultilineText({
         title: `Generate ${cellType} cell with Claude`,
-        label: `Describe the ${cellType} cell to generate:`,
         placeholder: placeholders[cellType],
         okLabel: 'Generate'
       });
-      if (!description.button.accept || !description.value) return;
+      if (!description) return;
 
       revealChat(chatPanel, labShell);
 
+      const pin = notebookPin(tracker);
       let prompt: string;
       if (cellType === 'code') {
-        prompt = `Please insert a new code cell in the current notebook that does the following: ${description.value}\n\nUse mcp__jupyter__insert_execute_code_cell (or insert_cell followed by execute_cell) to add it. Do not just show the code as text.`;
+        prompt = `${pin}Please insert a new code cell in this notebook that does the following: ${description}\n\nUse mcp__jupyter__insert_execute_code_cell (or insert_cell followed by execute_cell) to add it. Do not just show the code as text.`;
       } else {
-        prompt = `Please insert a new ${cellType} cell in the current notebook with the following content: ${description.value}\n\nUse mcp__jupyter__insert_cell with cell_type="${cellType}". Do NOT execute the cell — ${cellType} cells are not executable. Return the raw content the cell should contain.`;
+        prompt = `${pin}Please insert a new ${cellType} cell in this notebook with the following content: ${description}\n\nUse mcp__jupyter__insert_cell with cell_type="${cellType}". Do NOT execute the cell — ${cellType} cells are not executable. Return the raw content the cell should contain.`;
       }
       chatPanel.sendMessage(prompt);
     }
@@ -164,14 +182,15 @@ export function registerCommands(
   commands.addCommand(CommandIDs.explainCell, {
     label: 'Explain this cell with Claude',
     caption: 'Ask Claude to insert a markdown cell explaining the active cell',
-    icon: editIcon,
+    icon: explainIcon,
     isEnabled: () => activeCell(tracker) !== null,
     execute: async () => {
       const info = activeCell(tracker);
       if (!info) return;
       revealChat(chatPanel, labShell);
+      const pin = notebookPin(tracker);
       chatPanel.sendMessage(
-        `Please insert a markdown cell ABOVE the currently active cell in the notebook that explains what this code does. The code to explain is:\n\n\`\`\`\n${info.source}\n\`\`\`\n\nUse mcp__jupyter__insert_cell with cell_type=markdown at the appropriate position. Keep the explanation focused and technical.`
+        `${pin}Please insert a markdown cell ABOVE the currently active cell in this notebook that explains what this code does. The code to explain is:\n\n\`\`\`\n${info.source}\n\`\`\`\n\nUse mcp__jupyter__insert_cell with cell_type=markdown at the appropriate position. Keep the explanation focused and technical.`
       );
     }
   });
@@ -180,7 +199,7 @@ export function registerCommands(
     label: 'Fix last error with Claude',
     caption:
       'Ask Claude to insert a corrected cell for the most recent cell error',
-    icon: bugIcon,
+    icon: correctCellIcon,
     isEnabled: () => tracker.currentWidget !== null,
     execute: async () => {
       const nb = tracker.currentWidget;
@@ -195,9 +214,10 @@ export function registerCommands(
         return;
       }
       revealChat(chatPanel, labShell);
+      const pin = notebookPin(tracker);
       const traceback = err.traceback.join('\n');
       chatPanel.sendMessage(
-        `A cell in the current notebook raised an error. Please insert a new code cell BELOW the failed cell containing a corrected version. Use mcp__jupyter__insert_execute_code_cell.\n\nFailed cell source:\n\`\`\`\n${err.cellSource}\n\`\`\`\n\nError: ${err.errorName}: ${err.errorValue}\n\nTraceback:\n\`\`\`\n${traceback}\n\`\`\``
+        `${pin}A cell in this notebook raised an error. Please insert a new code cell BELOW the failed cell containing a corrected version. Use mcp__jupyter__insert_execute_code_cell.\n\nFailed cell source:\n\`\`\`\n${err.cellSource}\n\`\`\`\n\nError: ${err.errorName}: ${err.errorValue}\n\nTraceback:\n\`\`\`\n${traceback}\n\`\`\``
       );
     }
   });
@@ -205,7 +225,7 @@ export function registerCommands(
   commands.addCommand(CommandIDs.mcpServers, {
     label: 'MCP servers…',
     caption: 'Choose which MCP servers Claude may use',
-    icon: extensionIcon,
+    icon: mcpServersIcon,
     execute: async () => {
       try {
         const enabled = await pickMcpServers();

@@ -18,6 +18,7 @@ const TIERS: Array<'opus' | 'sonnet' | 'haiku'> = ['opus', 'sonnet', 'haiku'];
 interface IChatUIProps {
   client: ChatClient;
   registerSubmit: (fn: (text: string) => void) => void;
+  getUserMessagePrefix?: () => string;
 }
 
 function ChatUI(props: IChatUIProps): JSX.Element {
@@ -107,7 +108,16 @@ function ChatUI(props: IChatUIProps): JSX.Element {
 
   const submitFromInput = (): void => {
     if (busy) return;
-    submitText(draft);
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    const prefix = props.getUserMessagePrefix?.() ?? '';
+    // Show the user's exact text in the transcript; send prefix + text to Claude.
+    setMessages(prev => [
+      ...prev,
+      { role: 'user', text: trimmed, id: nextId() }
+    ]);
+    props.client.send(prefix + trimmed);
+    setBusy(true);
     setDraft('');
   };
 
@@ -189,6 +199,7 @@ function ChatUI(props: IChatUIProps): JSX.Element {
 
 export class ChatPanelWidget extends ReactWidget {
   private _submit: ((text: string) => void) | null = null;
+  private _userMessagePrefix: (() => string) | null = null;
 
   constructor(private readonly client: ChatClient) {
     super();
@@ -199,6 +210,13 @@ export class ChatPanelWidget extends ReactWidget {
     this.addClass('jclaude-panel-widget');
   }
 
+  /** Provide a fn that returns text to prepend to free-form user messages
+   * (e.g. a notebook-context pin). Not applied to command-driven sendMessage()
+   * calls — those already include their own context. */
+  setUserMessagePrefixProvider(fn: () => string): void {
+    this._userMessagePrefix = fn;
+  }
+
   render(): JSX.Element {
     return (
       <ChatUI
@@ -206,6 +224,7 @@ export class ChatPanelWidget extends ReactWidget {
         registerSubmit={fn => {
           this._submit = fn;
         }}
+        getUserMessagePrefix={() => this._userMessagePrefix?.() ?? ''}
       />
     );
   }
