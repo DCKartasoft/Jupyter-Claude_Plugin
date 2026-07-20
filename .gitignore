@@ -128,9 +128,7 @@ dmypy.json
 .yarn/
 
 # Claude Code
-.claude/scheduled_tasks.lock
-.claude/settings.local.json
-.claude/skills/
+.claude/
 
 # Local scratch/test artifacts
 *.tif

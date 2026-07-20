@@ -145,9 +145,9 @@ Only if we want token-by-token fill-in of a cell being generated: add `@tool("st
 4. **MCP tool visibility** — inspect the first `SystemMessage(subtype="init")` from the SDK; `message.data["mcp_servers"]["jupyter"].tools` must include the cell R/W tools.
 5. **Permission gating** — verify `permission_prompt_tool_name="jclaude_approve"` fires a modal in the panel before Claude writes/executes a cell for the first time in a session.
 
-## Step 6 — User guide and polish (optional)
+## Step 6 — User guide and polish (optional, DONE)
 
-For new users, add **docs/USER_GUIDE.md** — comprehensive install & operation reference covering requirements, dev setup, both backend paths (Anthropic direct + AWS Bedrock SSO), launch procedure, all five v1 commands (chat, generate, explain, fix, MCP servers), per-tier model reference table, troubleshooting (including common gotchas: stale `page_config.json` disabled/locked lists, SSO expiry, missing kernel), and uninstall. Cross-link from `README.md`.
+**docs/USER_GUIDE.md** — comprehensive install & operation reference covering requirements, dev setup, both backend paths (Anthropic direct + AWS Bedrock SSO), launch procedure, all five v1 commands (chat, generate, explain, fix, MCP servers), per-tier model reference table, troubleshooting (including common gotchas: stale `page_config.json` disabled/locked lists, SSO expiry, missing kernel), and uninstall. Cross-linked from `README.md`. Includes a "Running on AWS SageMaker" section with Studio JupyterLab 4 setup, required IAM permissions, lifecycle config install script, and SageMaker-specific deployment gotchas.
 
 ## Critical files to touch
 
@@ -167,6 +167,10 @@ For new users, add **docs/USER_GUIDE.md** — comprehensive install & operation 
 | [schema/plugin.json]              | Toolbar registration + settings schema + per-tier model traits                                         |
 | [pyproject.toml]                  | Add `claude-agent-sdk`, `jupyter-mcp-server`, `jupyter-collaboration`                                  |
 | [docs/USER_GUIDE.md]              | User-facing operation manual (install, launch, commands, troubleshooting)                              |
+
+## Step 7 — PyPI publication prep (DONE)
+
+Package renamed to `jupyter-claude-plugin` on PyPI (internal Python package stays `jupyter_claude`). Version bumped to `0.1.0a1` with PEP 440 pre-release tag to prevent accidental adoption of alpha code. Runtime dependencies (`claude-agent-sdk`, `jupyter-mcp-server`, `jupyter-collaboration`) now explicitly declared. Wheel auto-discovery fixed for post-rename builds. Verified installation works cleanly in a scratch venv. Updated install instructions to prefer `pip install --pre jupyter-claude-plugin` over source install; source path becomes the dev-only path.
 
 ## Out of scope for v1
 
