@@ -124,8 +124,3 @@ jupyter labextension list
 - [docs/Architecture.md](docs/Architecture.md) — component diagram and data flow
 - [CHANGELOG.md](CHANGELOG.md) — human-readable milestone log
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-_This README is maintained by an automated doc-keeper — it re-writes from [docs/DECISIONS.md](docs/DECISIONS.md) every hour._
