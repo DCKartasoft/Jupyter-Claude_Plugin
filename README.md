@@ -125,4 +125,3 @@ jupyter labextension list
 - [docs/DECISIONS.md](docs/DECISIONS.md) — decision log and rationale
 - [docs/Architecture.md](docs/Architecture.md) — component diagram and data flow
 - [CHANGELOG.md](CHANGELOG.md) — human-readable milestone log
-
