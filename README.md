@@ -4,6 +4,8 @@ A JupyterLab extension enabling collaborative development between users and Clau
 
 > **Status:** early development, scaffold phase complete. See [docs/PLAN.md](docs/PLAN.md) for the implementation plan and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
 
+![Jupyter Claude Plugin](Jupyter-%20Claude%20plugin.jpg)
+
 ## Features (v1)
 
 - **Chat about the notebook** — ask Claude to analyze, summarize, or answer questions about your entire notebook
