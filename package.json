@@ -1,6 +1,6 @@
 {
     "name": "@dckartasoft/jupyter-claude",
-    "version": "0.1.0-alpha.2",
+    "version": "0.1.0-alpha.3",
     "description": "Collaborate with Claude on Jupyter notebook code and documentation",
     "keywords": [
         "jupyter",

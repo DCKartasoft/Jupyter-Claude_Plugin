@@ -7,10 +7,10 @@
 
 ## Release
 
-**PyPI:** `jupyter-claude-plugin 0.1.0a1` — live. Install verified:
+**PyPI:** `jupyter-claude-plugin 0.1.0a2` — live. Install verified:
 ```bash
 uv pip install --pre jupyter-claude-plugin
-# → @dckartasoft/jupyter-claude v0.1.0-alpha.1 enabled OK
+# → @dckartasoft/jupyter-claude v0.1.0-alpha.2 enabled OK
 ```
 
 **CI:** Green on all four workflows (build, Check Links, Integration tests, test_isolated).
@@ -94,7 +94,7 @@ c.ClaudeExtensionApp.default_sonnet_model = "us.anthropic.claude-sonnet-4-6"
 c.ClaudeExtensionApp.default_haiku_model = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 c.ClaudeExtensionApp.permission_mode = "acceptEdits"
 c.ClaudeExtensionApp.cloudwatch_log_group = "/aws/jupyter-claude/sessions-dev"
-c.ClaudeExtensionApp.cloudwatch_region = "us-east-1"   # SageMaker instance region
+c.ClaudeExtensionApp.cloudwatch_region = "us-east-2"   # region the log group is in
 ```
 
 Launch: `jupyter lab` — no aws-vault or profile needed.
@@ -105,14 +105,9 @@ Launch: `jupyter lab` — no aws-vault or profile needed.
 
 ---
 
-## Uncommitted Changes (2026-08-17)
+## Uncommitted Changes
 
-| File | Change |
-|---|---|
-| `jupyter_claude/config.py` | Added `cloudwatch_log_group` and `cloudwatch_region` traits |
-| `jupyter_claude/chat_handler.py` | CloudWatch per-user session logging on `ResultMessage` |
-
-Hold for commit until SageMaker infrastructure is deployed and testable.
+None — all changes included in v0.1.0a2 and published to PyPI on 2026-08-19.
 
 ---
 
@@ -128,8 +123,8 @@ Hold for commit until SageMaker infrastructure is deployed and testable.
 
 ## What's Next
 
-1. **In progress:** Deploy SageMaker infrastructure in `Claude_Bedrock_CLI`
-2. Commit CloudWatch plugin changes once infra is ready to test
-3. Optional: tag `v0.1.0a1` on GitHub
+1. **In progress:** Deploy SageMaker infrastructure in `Claude_Bedrock_CLI` (two CFN stacks)
+2. Apply lifecycle configuration to SageMaker notebook instance and verify end-to-end
+3. Optional: tag `v0.1.0a2` on GitHub
 4. Optional: wire GitHub Actions trusted publishing (`publish-release.yml`)
 5. Deferred: `stream_cell_delta` tool for token-by-token cell fill-in

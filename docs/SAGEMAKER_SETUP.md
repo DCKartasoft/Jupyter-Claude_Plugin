@@ -119,7 +119,7 @@ c.ClaudeExtensionApp.permission_mode = "acceptEdits"
 
 # Per-user CloudWatch session tracking
 c.ClaudeExtensionApp.cloudwatch_log_group = "/aws/jupyter-claude/sessions-dev"
-c.ClaudeExtensionApp.cloudwatch_region    = "us-east-1"   # region your SageMaker instance runs in
+c.ClaudeExtensionApp.cloudwatch_region    = "us-east-2"   # region the log group is in
 EOF
 ```
 
@@ -212,7 +212,10 @@ JUPYTER_CONFIG=/home/ec2-user/.jupyter/jupyter_server_config.py
 
 # ── 1. Install / upgrade plugin ───────────────────────────────────────────
 echo "[jupyter-claude] Installing plugin..."
-$PIP install --quiet --pre jupyter-claude-plugin
+$PIP install --quiet --pre jupyter-claude-plugin --root-user-action=ignore --no-deps
+
+# Fix ownership so JupyterLab (running as ec2-user) can serve the static bundle
+chown -R ec2-user:ec2-user /home/ec2-user/anaconda3/share/jupyter/labextensions/@dckartasoft/ 2>/dev/null || true
 
 # ── 2. Append Claude config (idempotent — skips if already present) ───────
 echo "[jupyter-claude] Configuring plugin..."
@@ -227,7 +230,7 @@ c.ClaudeExtensionApp.default_sonnet_model = "us.anthropic.claude-sonnet-4-6"
 c.ClaudeExtensionApp.default_haiku_model  = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 c.ClaudeExtensionApp.permission_mode      = "acceptEdits"
 c.ClaudeExtensionApp.cloudwatch_log_group = "/aws/jupyter-claude/sessions-dev"
-c.ClaudeExtensionApp.cloudwatch_region    = "us-east-1"
+c.ClaudeExtensionApp.cloudwatch_region    = "us-east-2"
 PYEOF
   echo "[jupyter-claude] Config written."
 else
