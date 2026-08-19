@@ -1,5 +1,15 @@
+import asyncio
 import json
 import traceback
+import uuid
+from datetime import datetime, timezone
+
+try:
+    import boto3
+    from botocore.exceptions import ClientError
+except ImportError:
+    boto3 = None
+    ClientError = Exception  # type: ignore[assignment,misc]
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -24,6 +34,11 @@ class ChatWebSocketHandler(JupyterHandler, WebSocketHandler):
     _tier: str = "sonnet"
     _mcp_url: str = ""
     _token: str = ""
+    _session_id: str = ""
+    _jupyter_user: str = "unknown"
+    _cw_client = None
+    _cw_log_group: str = ""
+    _cw_log_stream: str = ""
 
     def check_origin(self, origin: str) -> bool:
         return True
@@ -35,10 +50,19 @@ class ChatWebSocketHandler(JupyterHandler, WebSocketHandler):
     async def open(self):
         cfg = self.settings["jclaude_config"]
         self._tier = cfg.main_model_tier
+        self._session_id = str(uuid.uuid4())
+        self._jupyter_user = self._resolve_user()
 
         jupyter_port = self.request.host.split(":")[-1] if ":" in self.request.host else "8888"
         self._mcp_url = cfg.jupyter_mcp_url or f"http://localhost:{jupyter_port}/mcp"
         self._token = self._resolve_token()
+
+        if cfg.cloudwatch_log_group and boto3 is not None:
+            region = cfg.cloudwatch_region or cfg.aws_region
+            self._cw_client = boto3.client("logs", region_name=region)
+            self._cw_log_group = cfg.cloudwatch_log_group
+            self._cw_log_stream = f"{self._jupyter_user}/{self._session_id}"
+            asyncio.ensure_future(self._init_cw_stream())
 
         try:
             await self._start_client(cfg)
@@ -46,6 +70,33 @@ class ChatWebSocketHandler(JupyterHandler, WebSocketHandler):
             self.log.exception("Failed to start Claude SDK client")
             await self._send({"type": "error", "message": str(exc), "traceback": traceback.format_exc()})
             self.close()
+
+    async def _init_cw_stream(self):
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._create_log_stream)
+
+    def _create_log_stream(self):
+        try:
+            self._cw_client.create_log_stream(
+                logGroupName=self._cw_log_group,
+                logStreamName=self._cw_log_stream,
+            )
+        except ClientError as e:
+            if e.response["Error"]["Code"] != "ResourceAlreadyExistsException":
+                self.log.warning("CloudWatch log stream creation failed: %s", e)
+
+    def _resolve_user(self) -> str:
+        try:
+            user = self.current_user
+            if user is None:
+                return "anonymous"
+            if hasattr(user, "username"):
+                return user.username
+            if hasattr(user, "name"):
+                return user.name
+            return str(user) or "anonymous"
+        except Exception:
+            return "unknown"
 
     async def _start_client(self, cfg):
         options = build_options(cfg, self._mcp_url, self._token, tier_override=self._tier)
@@ -169,6 +220,43 @@ class ChatWebSocketHandler(JupyterHandler, WebSocketHandler):
                 "total_cost_usd": m.total_cost_usd,
                 "usage": m.usage,
             })
+            if self._cw_client:
+                asyncio.ensure_future(self._emit_usage(m))
+
+    async def _emit_usage(self, m: ResultMessage):
+        cfg = self.settings["jclaude_config"]
+        usage = m.usage
+        if hasattr(usage, "__dict__"):
+            usage_dict = {k: v for k, v in vars(usage).items() if not k.startswith("_")}
+        elif isinstance(usage, dict):
+            usage_dict = usage
+        else:
+            usage_dict = {}
+
+        record = {
+            "user": self._jupyter_user,
+            "session_id": self._session_id,
+            "tier": self._tier,
+            "model": self._resolve_model_id(cfg),
+            "backend": cfg.backend,
+            "num_turns": m.num_turns,
+            "duration_ms": m.duration_ms,
+            "total_cost_usd": m.total_cost_usd,
+            **usage_dict,
+        }
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._put_log_event, record)
+
+    def _put_log_event(self, record: dict):
+        try:
+            ts_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+            self._cw_client.put_log_events(
+                logGroupName=self._cw_log_group,
+                logStreamName=self._cw_log_stream,
+                logEvents=[{"timestamp": ts_ms, "message": json.dumps(record)}],
+            )
+        except Exception:
+            self.log.warning("CloudWatch usage emit failed", exc_info=True)
 
     async def _send(self, payload: dict):
         try:
@@ -192,5 +280,4 @@ class ChatWebSocketHandler(JupyterHandler, WebSocketHandler):
                 except Exception:
                     self.log.exception("Error closing Claude SDK client")
 
-            import asyncio
             asyncio.ensure_future(_cleanup())

@@ -147,6 +147,25 @@ class ClaudeExtensionApp(ExtensionApp):
         help="Log every message the SDK produces at INFO level.",
     )
 
+    cloudwatch_log_group = Unicode(
+        "",
+        config=True,
+        help="CloudWatch Logs log group name for per-user session tracking. "
+        "Empty (default) disables CloudWatch emission. "
+        "Example: `/aws/jupyter-claude/sessions`. "
+        "The process credentials (SageMaker execution role or ambient AWS profile) "
+        "must have logs:CreateLogStream and logs:PutLogEvents on this log group.",
+    )
+
+    cloudwatch_region = Unicode(
+        "",
+        config=True,
+        help="AWS region for the CloudWatch Logs client. Empty (default) inherits "
+        "from `aws_region`. Override only when the log group is in a different "
+        "region than Bedrock (e.g. SageMaker in us-east-1, Bedrock governance "
+        "stacks in us-east-2).",
+    )
+
     def initialize_settings(self):
         self.settings["jclaude_config"] = self
         if self.backend == "bedrock":
