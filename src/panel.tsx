@@ -19,6 +19,7 @@ interface IChatUIProps {
   client: ChatClient;
   registerSubmit: (fn: (text: string) => void) => void;
   getUserMessagePrefix?: () => string;
+  onResult?: () => void;
 }
 
 function ChatUI(props: IChatUIProps): JSX.Element {
@@ -59,6 +60,7 @@ function ChatUI(props: IChatUIProps): JSX.Element {
             ];
           case 'result':
             setBusy(false);
+            props.onResult?.();
             return [
               ...prev,
               {
@@ -200,6 +202,7 @@ function ChatUI(props: IChatUIProps): JSX.Element {
 export class ChatPanelWidget extends ReactWidget {
   private _submit: ((text: string) => void) | null = null;
   private _userMessagePrefix: (() => string) | null = null;
+  private _onResult: (() => void) | null = null;
 
   constructor(private readonly client: ChatClient) {
     super();
@@ -217,6 +220,10 @@ export class ChatPanelWidget extends ReactWidget {
     this._userMessagePrefix = fn;
   }
 
+  setOnResult(fn: () => void): void {
+    this._onResult = fn;
+  }
+
   render(): JSX.Element {
     return (
       <ChatUI
@@ -225,6 +232,7 @@ export class ChatPanelWidget extends ReactWidget {
           this._submit = fn;
         }}
         getUserMessagePrefix={() => this._userMessagePrefix?.() ?? ''}
+        onResult={() => this._onResult?.()}
       />
     );
   }

@@ -51,6 +51,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
     // without calling mcp__jupyter__read_notebook.
     chatPanel.setUserMessagePrefixProvider(() => notebookPin(tracker));
 
+    // After every Claude response, reload the active notebook so any cells
+    // written by the MCP tools appear without a manual "Reload from Disk".
+    chatPanel.setOnResult(() => {
+      app.commands.execute('docmanager:reload').catch(() => {});
+    });
+
     registerCommands(app, tracker, labShell, palette, chatPanel, client);
 
     labShell.add(chatPanel, 'right', { rank: 900 });

@@ -53,8 +53,7 @@ class ChatWebSocketHandler(JupyterHandler, WebSocketHandler):
         self._session_id = str(uuid.uuid4())
         self._jupyter_user = self._resolve_user()
 
-        jupyter_port = self.request.host.split(":")[-1] if ":" in self.request.host else "8888"
-        self._mcp_url = cfg.jupyter_mcp_url or f"http://localhost:{jupyter_port}/mcp"
+        self._mcp_url = cfg.jupyter_mcp_url or self._resolve_mcp_url()
         self._token = self._resolve_token()
 
         if cfg.cloudwatch_log_group and boto3 is not None:
@@ -84,6 +83,21 @@ class ChatWebSocketHandler(JupyterHandler, WebSocketHandler):
         except ClientError as e:
             if e.response["Error"]["Code"] != "ResourceAlreadyExistsException":
                 self.log.warning("CloudWatch log stream creation failed: %s", e)
+
+    def _resolve_mcp_url(self) -> str:
+        """Derive MCP URL from the running server's actual port and scheme.
+
+        SageMaker runs Jupyter on HTTPS/8443, not HTTP/8888. Reading the
+        serverapp attributes is more reliable than parsing the request host.
+        """
+        try:
+            app = self.serverapp
+            port = getattr(app, "port", None) or 8888
+            certfile = getattr(app, "certfile", None)
+            scheme = "https" if certfile else "http"
+            return f"{scheme}://localhost:{port}/mcp"
+        except Exception:
+            return "http://localhost:8888/mcp"
 
     def _resolve_user(self) -> str:
         try:

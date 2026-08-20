@@ -32,7 +32,6 @@ dependencies = [
     "jupyter_server>=2.4.0,<3",
     "claude-agent-sdk>=0.1",
     "jupyter-mcp-server>=1.0",
-    "jupyter-collaboration>=2.0",
 ]
 dynamic = ["version", "description", "authors", "keywords"]
 

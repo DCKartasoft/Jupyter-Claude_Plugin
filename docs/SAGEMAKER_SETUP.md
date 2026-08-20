@@ -31,6 +31,7 @@ Before starting, confirm the following with your AWS administrator:
    - `logs:CreateLogStream` and `logs:PutLogEvents` on `/aws/jupyter-claude/sessions-dev`
    - This is provisioned by the `dev-sagemaker-execution-role` CloudFormation stack in
      `Claude_Bedrock_CLI`. Confirm with your admin that it has been deployed.
+
 2. **JupyterLab 4** — the plugin requires JupyterLab 4. Classic SageMaker notebook instances
    often ship JupyterLab 3. Confirm in a terminal:
 
@@ -38,6 +39,7 @@ Before starting, confirm the following with your AWS administrator:
    jupyter lab --version
    # Must be 4.x — if not, ask your admin to upgrade the instance or use SageMaker Studio
    ```
+
 3. **Internet access** — the instance needs outbound access to PyPI (`pypi.org`) to install
    the plugin. Bedrock calls go via AWS-internal endpoints and do not require extra egress rules.
 
@@ -168,6 +170,7 @@ After the page reloads:
    ```
    Connected — bedrock / us.anthropic.claude-sonnet-4-6
    ```
+
 3. **Send a test message** — type `"hello"` and press Enter. You should get a response within
    a few seconds.
 4. **Verify CloudWatch logging** — from a terminal with admin AWS credentials (not on the
@@ -338,11 +341,11 @@ tail -100 /var/log/jupyter.log 2>/dev/null || journalctl -u jupyter-server -n 10
 
 Common causes on SageMaker:
 
-| Symptom in log                                 | Cause                                               | Fix                                                                           |
-| ---------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `AccessDeniedException: bedrock:InvokeModel` | Execution role missing Bedrock policy               | Ask admin to attach the policy                                                |
-| `Could not connect to MCP server`            | `jupyter_mcp_server` not installed or not running | Re-run`pip install --pre jupyter-claude-plugin` and restart                 |
-| `NoCredentialError`                          | `aws_profile` set to a value that doesn't exist   | Remove`aws_profile` from config — leave it empty                           |
+| Symptom in log                               | Cause                                             | Fix                                                                           |
+| -------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `AccessDeniedException: bedrock:InvokeModel` | Execution role missing Bedrock policy             | Ask admin to attach the policy                                                |
+| `Could not connect to MCP server`            | `jupyter_mcp_server` not installed or not running | Re-run`pip install --pre jupyter-claude-plugin` and restart                   |
+| `NoCredentialError`                          | `aws_profile` set to a value that doesn't exist   | Remove`aws_profile` from config — leave it empty                              |
 | `EndpointResolutionError`                    | Wrong`aws_region`                                 | Confirm Bedrock is enabled in that region; us-east-2 is the governance region |
 
 ### CloudWatch logs not appearing

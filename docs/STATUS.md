@@ -8,6 +8,7 @@
 ## Release
 
 **PyPI:** `jupyter-claude-plugin 0.1.0a2` — live. Install verified:
+
 ```bash
 uv pip install --pre jupyter-claude-plugin
 # → @dckartasoft/jupyter-claude v0.1.0-alpha.2 enabled OK
@@ -40,25 +41,25 @@ f225cbb  build: exclude .claude/ from sdist
 
 All traits are set in `~/.jupyter/jupyter_server_config.py` or JupyterLab Settings Editor.
 
-| Trait | Type | Default | Notes |
-|---|---|---|---|
-| `backend` | enum | `anthropic` | `anthropic` or `bedrock` |
-| `model` | str | `claude-opus-4-8` | Anthropic-direct only |
-| `aws_region` | str | `us-east-1` | Bedrock region |
-| `aws_profile` | str | `""` | SSO profile; leave empty on SageMaker (uses IMDS) |
-| `default_opus_model` | str | `us.anthropic.claude-opus-4-7` | Bedrock inference profile ID |
-| `default_sonnet_model` | str | `us.anthropic.claude-sonnet-4-6` | Bedrock inference profile ID |
-| `default_haiku_model` | str | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | Bedrock inference profile ID |
-| `main_model_tier` | enum | `sonnet` | opus / sonnet / haiku |
-| `system_prompt` | str | (see config.py) | Steers Claude toward notebook snapshot |
-| `notebook_snapshot_max_cells` | int | `50` | Cells included in prompt prefix |
-| `notebook_snapshot_max_source_chars` | int | `2000` | Per-cell char cap |
-| `jupyter_mcp_url` | str | `""` | Auto-detected from Jupyter port when empty |
-| `enabled_mcp_servers` | list | `["jupyter"]` | `jupyter` always force-added |
-| `permission_mode` | enum | `default` | `acceptEdits` recommended |
-| `verbose` | bool | `False` | Logs every SDK message at INFO |
-| `cloudwatch_log_group` | str | `""` | CW log group for per-user tracking; disabled when empty |
-| `cloudwatch_region` | str | `""` | CW client region; falls back to `aws_region` when empty |
+| Trait                                | Type | Default                                       | Notes                                                   |
+| ------------------------------------ | ---- | --------------------------------------------- | ------------------------------------------------------- |
+| `backend`                            | enum | `anthropic`                                   | `anthropic` or `bedrock`                                |
+| `model`                              | str  | `claude-opus-4-8`                             | Anthropic-direct only                                   |
+| `aws_region`                         | str  | `us-east-1`                                   | Bedrock region                                          |
+| `aws_profile`                        | str  | `""`                                          | SSO profile; leave empty on SageMaker (uses IMDS)       |
+| `default_opus_model`                 | str  | `us.anthropic.claude-opus-4-7`                | Bedrock inference profile ID                            |
+| `default_sonnet_model`               | str  | `us.anthropic.claude-sonnet-4-6`              | Bedrock inference profile ID                            |
+| `default_haiku_model`                | str  | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | Bedrock inference profile ID                            |
+| `main_model_tier`                    | enum | `sonnet`                                      | opus / sonnet / haiku                                   |
+| `system_prompt`                      | str  | (see config.py)                               | Steers Claude toward notebook snapshot                  |
+| `notebook_snapshot_max_cells`        | int  | `50`                                          | Cells included in prompt prefix                         |
+| `notebook_snapshot_max_source_chars` | int  | `2000`                                        | Per-cell char cap                                       |
+| `jupyter_mcp_url`                    | str  | `""`                                          | Auto-detected from Jupyter port when empty              |
+| `enabled_mcp_servers`                | list | `["jupyter"]`                                 | `jupyter` always force-added                            |
+| `permission_mode`                    | enum | `default`                                     | `acceptEdits` recommended                               |
+| `verbose`                            | bool | `False`                                       | Logs every SDK message at INFO                          |
+| `cloudwatch_log_group`               | str  | `""`                                          | CW log group for per-user tracking; disabled when empty |
+| `cloudwatch_region`                  | str  | `""`                                          | CW client region; falls back to `aws_region` when empty |
 
 ---
 
@@ -100,6 +101,7 @@ c.ClaudeExtensionApp.cloudwatch_region = "us-east-2"   # region the log group is
 Launch: `jupyter lab` — no aws-vault or profile needed.
 
 **Prerequisites (infrastructure not yet deployed):**
+
 - `Claude_Bedrock_CLI` stacks `dev/use1/07-jupyter-claude-logging` and `08-sagemaker-execution-role` must be deployed first.
 - See `Claude_Bedrock_CLI/Docs/SAGEMAKER-JUPYTER-INTEGRATION.md` for full instructions.
 
