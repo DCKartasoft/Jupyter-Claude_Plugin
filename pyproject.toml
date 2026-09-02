@@ -43,7 +43,7 @@ Changelog = "https://github.com/DCKartasoft/Jupyter-Claude_Plugin/blob/main/CHAN
 
 [project.optional-dependencies]
 mcp-server = [
-    "jupyter-mcp-server>=1.0",
+    "jupyter-mcp-server>=0.1.0",
 ]
 dev = [
     "jupyterlab>=4",
