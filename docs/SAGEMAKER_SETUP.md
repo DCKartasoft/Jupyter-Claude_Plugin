@@ -1,385 +1,281 @@
 # Jupyter Claude Plugin — SageMaker Notebook Setup Guide
 
-> This guide covers installing and configuring the `jupyter-claude-plugin` on an **AWS SageMaker
-> notebook instance** (classic or Studio with JupyterLab 4). All steps are performed from the
-> JupyterLab terminal inside the instance.
+> This guide covers the **isolated MCP server architecture** required for SageMaker notebook
+> instances (classic, AL2023). This approach was confirmed working 2026-09-02 following an
+> AWS Support recommendation to isolate the collaboration stack.
 >
 > For local dev setup, see [USER_GUIDE.md](USER_GUIDE.md).
+
+## Architecture Overview
+
+```
+JupyterSystemEnv (port 8443, primary server)
+  └── jupyter-claude-plugin (no collaboration stack)
+        └── connects via HTTP → http://127.0.0.1:8889/mcp
+
+SageMaker/mcp-isolated-env (port 8889, loopback only)
+  └── jupyter-mcp-server only
+        └── All Jupyter dirs under SageMaker/ (persist across Stop/Start)
+```
+
+**Why isolated?** `jupyter-mcp-server` depends on `jupyter-server-nbmodel` (Datalayer), which
+ships a frontend labextension that intercepts notebook opens and fails with
+`{"reason":"unknown_session"}` on SageMaker's auth proxy — causing permanent spinners and
+"session expired" dialogs. Running the MCP server in a completely separate venv with its own
+Jupyter dirs keeps JupyterSystemEnv clean.
+
+---
 
 ## Contents
 
 - [Prerequisites](#prerequisites)
-- [Step 1 — Verify the environment](#step-1--verify-the-environment)
-- [Step 2 — Install the plugin](#step-2--install-the-plugin)
-- [Step 3 — Configure the plugin](#step-3--configure-the-plugin)
-- [Step 4 — Restart the Jupyter server](#step-4--restart-the-jupyter-server)
-- [Step 5 — Verify the setup](#step-5--verify-the-setup)
-- [Step 6 — Make the install persistent](#step-6--make-the-install-persistent)
-- [Manual file update (for testing pre-release changes)](#manual-file-update-for-testing-pre-release-changes)
+- [Automated lifecycle setup (recommended)](#automated-lifecycle-setup)
+- [Manual setup](#manual-setup)
+- [Manual MCP server restart (after primary server restart)](#manual-mcp-server-restart)
 - [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Prerequisites
 
-Before starting, confirm the following with your AWS administrator:
+1. **SageMaker execution role** must have:
+   - `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` on Claude inference profiles
+   - `logs:CreateLogStream` and `logs:PutLogEvents` on `/aws/jupyter-claude/sessions`
+   - `ssm:PutParameter` on `/jupyter-claude-federated/*`
+   - Provisioned by the `dev-sagemaker-execution-role` CloudFormation stack in `Claude_Bedrock_CLI`
 
-1. **SageMaker execution role** — the role attached to your notebook instance must have:
+2. **Instance type**: `ml.t3.medium` or larger. The lifecycle script skips validation on `ml.t3.*` instances.
 
-   - `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` on the approved
-     Claude inference profiles
-   - `logs:CreateLogStream` and `logs:PutLogEvents` on `/aws/jupyter-claude/sessions-dev`
-   - This is provisioned by the `dev-sagemaker-execution-role` CloudFormation stack in
-     `Claude_Bedrock_CLI`. Confirm with your admin that it has been deployed.
-
-2. **JupyterLab 4** — the plugin requires JupyterLab 4. Classic SageMaker notebook instances
-   often ship JupyterLab 3. Confirm in a terminal:
-
-   ```bash
-   jupyter lab --version
-   # Must be 4.x — if not, ask your admin to upgrade the instance or use SageMaker Studio
-   ```
-
-3. **Internet access** — the instance needs outbound access to PyPI (`pypi.org`) to install
-   the plugin. Bedrock calls go via AWS-internal endpoints and do not require extra egress rules.
+3. **Python 3.10** available in JupyterSystemEnv (`/home/ec2-user/anaconda3/envs/JupyterSystemEnv`). Required for `mcp[cli]` dependency.
 
 ---
 
-## Step 1 — Verify the environment
+## Automated Lifecycle Setup
 
-Open a terminal in JupyterLab (**File → New → Terminal**) and run:
+The preferred approach. The lifecycle block is in `Jupyter-Claude-Federated/sagemaker/on_start_federated.sh` and is sourced from the main `on_start.sh` in the `iac_deployment` repo.
 
+**Deploy via Sceptre** (from `iac_deployment/`):
 ```bash
-# 1. Confirm JupyterLab version
-jupyter lab --version          # must be 4.x
-
-# 2. Confirm Python version
-python --version               # 3.10 or higher
-
-# 3. Confirm Bedrock is reachable via the execution role (no profile needed)
-aws bedrock list-inference-profiles --region us-east-2 \
-  | python -c "import sys,json; [print(p['inferenceProfileId']) for p in json.load(sys.stdin)['inferenceProfileSummaries'] if 'claude' in p['inferenceProfileId']]"
-# Expected: us.anthropic.claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5-20251001-v1:0
+sceptre --var-file config/vars/dev.yaml launch dev/use2/Assets/dcdevmlps-v0/mlps-al2023-deploy
 ```
 
-If the Bedrock call fails with `AccessDeniedException`, the execution role is missing
-the required policy — contact your admin before proceeding.
+The lifecycle script performs 11 steps (fully backgrounded, never blocks the 5-min timeout):
+
+| Step | Action |
+|------|--------|
+| 1 | Remove collaboration stack from JupyterSystemEnv |
+| 2 | Restart primary server (clean state) |
+| 3 | Create isolated venv at `SageMaker/mcp-isolated-env` using JupyterSystemEnv Python 3.10 |
+| 4 | Install `jupyter-mcp-server>=0.1.0` in isolated venv (idempotent) |
+| 5 | Generate/read stable token at `SageMaker/mcp-isolated-token` |
+| 6 | Publish token to SSM (`/jupyter-claude-federated/{instance}/token`) |
+| 7 | Kill any stale MCP server process |
+| 8 | Install `claude-agent-sdk>=0.1` (--pre), then `jupyter-claude-plugin>=0.1.0a5` |
+| 9 | Write `jupyter_server_config.py` (idempotent `[jcf-begin]/[jcf-end]` block) |
+| 10 | Restart primary server to load the plugin |
+| 11 | **Start isolated MCP server** (after all restarts — won't be killed) |
+
+Log: `~/SageMaker/logs/jupyter-mcp.log`
 
 ---
 
-## Step 2 — Install the plugin
+## Manual Setup
 
-From the JupyterLab terminal:
+If the lifecycle script hasn't run or you need to bootstrap manually:
+
+### 1. Remove collaboration stack from JupyterSystemEnv
 
 ```bash
-pip install --pre jupyter-claude-plugin
+JUPYTER_ENV=/home/ec2-user/anaconda3/envs/JupyterSystemEnv
+$JUPYTER_ENV/bin/pip uninstall -y \
+  jupyter-mcp-server jupyter-collaboration jupyter-collaboration-ui \
+  jupyter-docprovider jupyter-server-ydoc jupyter-server-nbmodel jupyter-server-fileid \
+  2>/dev/null || true
 ```
 
-Verify all three server extensions are registered:
+### 2. Create isolated venv (if not already present)
 
 ```bash
-jupyter server extension list | grep -E "jupyter_claude|jupyter_mcp"
-# Expected output (all three must show "enabled"):
-#   jupyter_claude          enabled  OK
-#   jupyter_mcp_server      enabled  OK
-#   jupyter_mcp_tools       enabled  OK  (or jupyter_mcp_server_tools)
+$JUPYTER_ENV/bin/python -m venv /home/ec2-user/SageMaker/mcp-isolated-env
+/home/ec2-user/SageMaker/mcp-isolated-env/bin/pip install "jupyter-mcp-server>=0.1.0"
 ```
 
-Verify the frontend extension:
+### 3. Generate token
 
 ```bash
-jupyter labextension list | grep claude
-# Expected:
-#   @dckartasoft/jupyter-claude v0.1.0-alpha.1 enabled OK
+python3 -c 'import secrets; print(secrets.token_urlsafe(32))' \
+  > /home/ec2-user/SageMaker/mcp-isolated-token
+chmod 600 /home/ec2-user/SageMaker/mcp-isolated-token
 ```
 
----
-
-## Step 3 — Configure the plugin
-
-Create (or edit) `~/.jupyter/jupyter_server_config.py`:
+### 4. Install plugin in JupyterSystemEnv
 
 ```bash
-mkdir -p ~/.jupyter
-cat >> ~/.jupyter/jupyter_server_config.py << 'EOF'
-c = get_config()  # noqa
-
-# Backend: use AWS Bedrock with IMDS credentials from the execution role
-c.ClaudeExtensionApp.backend = "bedrock"
-c.ClaudeExtensionApp.aws_region = "us-east-2"          # Bedrock governance region
-
-# DO NOT set aws_profile — leave it empty so credentials come from the execution role
-# c.ClaudeExtensionApp.aws_profile = ""  (this is the default; no need to set it)
-
-# Bedrock inference profile IDs
-c.ClaudeExtensionApp.default_opus_model   = "us.anthropic.claude-opus-4-7"
-c.ClaudeExtensionApp.default_sonnet_model = "us.anthropic.claude-sonnet-4-6"
-c.ClaudeExtensionApp.default_haiku_model  = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
-
-# Auto-approve cell insertions (recommended for data science workflows)
-c.ClaudeExtensionApp.permission_mode = "acceptEdits"
-
-# Per-user CloudWatch session tracking
-c.ClaudeExtensionApp.cloudwatch_log_group = "/aws/jupyter-claude/sessions-dev"
-c.ClaudeExtensionApp.cloudwatch_region    = "us-east-2"   # region the log group is in
-EOF
+JUPYTER_ENV=/home/ec2-user/anaconda3/envs/JupyterSystemEnv
+$JUPYTER_ENV/bin/pip install --pre "claude-agent-sdk>=0.1"
+$JUPYTER_ENV/bin/pip install --pre "jupyter-claude-plugin>=0.1.0a5"
 ```
 
-> **Why no `aws_profile`?** Named profiles read from `~/.aws/credentials`, which the SageMaker
-> execution role does not populate. Leaving the trait empty tells the plugin to use the standard
-> AWS credential chain, which automatically finds the instance metadata (IMDS) credentials
-> provided by the execution role.
-
----
-
-## Step 4 — Restart the Jupyter server
-
-The config file is only read at server startup. You must restart Jupyter for changes to take effect.
-
-### Classic SageMaker notebook instances
+### 5. Write plugin config
 
 ```bash
-sudo systemctl restart jupyter-server
-```
-
-If that command is not found, try:
-
-```bash
-sudo initctl restart jupyter-server
-# or
-sudo service jupyter restart
-```
-
-The browser will show **"Server connection lost"**. Wait ~30 seconds, then reload the page.
-
-### SageMaker Studio (JupyterLab app)
-
-From the menu bar: **File → Shut Down**. Then relaunch the JupyterLab space from the
-SageMaker Studio control panel.
-
----
-
-## Step 5 — Verify the setup
-
-After the page reloads:
-
-1. **Look for the Claude icon** in the right sidebar (a small spark/lightning bolt icon).
-   Click it to open the chat panel.
-2. **Check the connection banner** at the top of the panel — it should read:
-
-   ```
-   Connected — bedrock / us.anthropic.claude-sonnet-4-6
-   ```
-
-3. **Send a test message** — type `"hello"` and press Enter. You should get a response within
-   a few seconds.
-4. **Verify CloudWatch logging** — from a terminal with admin AWS credentials (not on the
-   SageMaker instance itself), check for the new log stream:
-
-   ```bash
-   aws logs describe-log-streams \
-     --log-group-name /aws/jupyter-claude/sessions-dev \
-     --region us-east-1 \
-     --order-by LastEventTime \
-     --descending \
-     --profile kartasoft-dev \
-     --query "logStreams[0]"
-   # Expected: a stream named like "your-username/550e8400-..."
-   ```
-
-If the panel shows a red error banner instead of "Connected", see [Troubleshooting](#troubleshooting).
-
----
-
-## Step 6 — Make the install persistent (lifecycle configuration)
-
-SageMaker re-initialises the Jupyter environment on every **Stop → Start** cycle. A lifecycle
-configuration script runs automatically before JupyterLab starts, so changes are in place by
-the time you open the browser.
-
-> **Important:** Do NOT add `sudo systemctl restart jupyter-server` to a lifecycle script.
-> The script already runs before Jupyter starts — a manual service restart breaks
-> SageMaker's auth handler and causes login prompts on every page load.
-
-### The script
-
-```bash
-#!/bin/bash
-set -euo pipefail
-
-# Full paths — lifecycle scripts run as root before conda is activated
-CONDA_DIR=/home/ec2-user/anaconda3
-PIP="$CONDA_DIR/bin/pip"
-PYTHON="$CONDA_DIR/bin/python"
-JUPYTER_CONFIG=/home/ec2-user/.jupyter/jupyter_server_config.py
-
-# ── 1. Install / upgrade plugin ───────────────────────────────────────────
-echo "[jupyter-claude] Installing plugin..."
-$PIP install --quiet --pre jupyter-claude-plugin --root-user-action=ignore --no-deps
-
-# Fix ownership so JupyterLab (running as ec2-user) can serve the static bundle
-chown -R ec2-user:ec2-user /home/ec2-user/anaconda3/share/jupyter/labextensions/@dckartasoft/ 2>/dev/null || true
-
-# ── 2. Append Claude config (idempotent — skips if already present) ───────
-echo "[jupyter-claude] Configuring plugin..."
-if ! grep -q "ClaudeExtensionApp" "$JUPYTER_CONFIG" 2>/dev/null; then
-  cat >> "$JUPYTER_CONFIG" << 'PYEOF'
-
-# ── jupyter-claude-plugin ─────────────────────────────────────────────────
-c.ClaudeExtensionApp.backend = "bedrock"
-c.ClaudeExtensionApp.aws_region = "us-east-2"
-c.ClaudeExtensionApp.default_opus_model   = "us.anthropic.claude-opus-4-7"
-c.ClaudeExtensionApp.default_sonnet_model = "us.anthropic.claude-sonnet-4-6"
-c.ClaudeExtensionApp.default_haiku_model  = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
-c.ClaudeExtensionApp.permission_mode      = "acceptEdits"
-c.ClaudeExtensionApp.cloudwatch_log_group = "/aws/jupyter-claude/sessions-dev"
-c.ClaudeExtensionApp.cloudwatch_region    = "us-east-2"
+MCP_TOKEN=$(cat /home/ec2-user/SageMaker/mcp-isolated-token)
+cat >> ~/.jupyter/jupyter_server_config.py << PYEOF
+# [jcf-begin]
+import os as _os
+_jcf_token_file = '/home/ec2-user/SageMaker/mcp-isolated-token'
+_jcf_token = open(_jcf_token_file).read().strip() if _os.path.exists(_jcf_token_file) else ''
+c.ClaudeExtensionApp.backend = 'bedrock'
+c.ClaudeExtensionApp.aws_region = 'us-east-2'
+c.ClaudeExtensionApp.jupyter_mcp_url = 'http://127.0.0.1:8889/mcp'
+c.ClaudeExtensionApp.jupyter_mcp_token = _jcf_token
+c.ClaudeExtensionApp.permission_mode = 'bypassPermissions'
+c.ClaudeExtensionApp.cloudwatch_log_group = '/aws/jupyter-claude/sessions'
+# [jcf-end]
 PYEOF
-  echo "[jupyter-claude] Config written."
-else
-  echo "[jupyter-claude] Config already present, skipping."
-fi
-
-# ── 3. Re-enable default file browser ────────────────────────────────────
-# jupyter-server-nbmodel (pulled in as a dependency) disables the default
-# JupyterLab file browser and replaces it with its own. This restores it so
-# notebooks are visible in the left sidebar.
-LABCONFIG_DIR=$($PYTHON -c "import jupyter_core.paths as p; print(p.jupyter_config_dir())")/labconfig
-mkdir -p "$LABCONFIG_DIR"
-cat > "$LABCONFIG_DIR/page_config.json" << 'EOF'
-{
-  "enabledExtensions": {
-    "@jupyterlab/filebrowser-extension:defaultFileBrowser": true
-  }
-}
-EOF
-echo "[jupyter-claude] File browser re-enabled."
-
-echo "[jupyter-claude] Setup complete."
 ```
 
-### Attaching the lifecycle configuration
-
-1. In the AWS console, go to **SageMaker → Notebook → Lifecycle configurations**.
-2. Click **Create configuration**, name it `jupyter-claude-plugin-setup`.
-3. Select the **Start notebook** tab and paste the script above.
-4. Click **Create configuration**.
-5. Go to **Notebook instances → your instance → Actions → Stop**.
-6. Once stopped: **Actions → Edit → Lifecycle configuration → select `jupyter-claude-plugin-setup` → Update**.
-7. **Actions → Start** — the script runs automatically before JupyterLab comes up.
-8. Open JupyterLab from the console link once the instance is **InService**.
-
-The file browser and Claude icon will be present from the first page load.
-
----
-
-## Manual file update (for testing pre-release changes)
-
-If you need to test modified plugin files before a new PyPI release:
-
-### 1. Upload files via JupyterLab
-
-Use the **upload button** (↑ icon) in the JupyterLab file browser to upload `config.py`
-and/or `chat_handler.py` into your home directory (`/home/ec2-user/` or `/root/`).
-
-### 2. Copy to the installed location
-
-From the terminal:
-
-```bash
-# Find the installed package location
-SITE=$(pip show jupyter-claude-plugin | grep Location | awk '{print $2}')
-echo "Installing to: $SITE/jupyter_claude/"
-
-# Copy the updated files
-cp ~/config.py      $SITE/jupyter_claude/config.py
-cp ~/chat_handler.py $SITE/jupyter_claude/chat_handler.py
-
-# Confirm
-python -c "from jupyter_claude.config import ClaudeExtensionApp; \
-           print('cloudwatch_log_group' in ClaudeExtensionApp.class_traits())"
-# → True
-```
-
-### 3. Restart the Jupyter server
+### 6. Restart primary server
 
 ```bash
 sudo systemctl restart jupyter-server
+sleep 8
 ```
 
-Reload the browser page after ~30 seconds.
+### 7. Start isolated MCP server
 
-> **Note:** Manually copied files are overwritten by the next `pip install --upgrade`.
-> This workflow is for testing only — raise a PR to get changes into a proper release.
+```bash
+# Fix permissions first (if dirs were created as root)
+sudo chown -R ec2-user:ec2-user \
+  /home/ec2-user/SageMaker/mcp-isolated-jupyter-config \
+  /home/ec2-user/SageMaker/mcp-isolated-jupyter-data \
+  /home/ec2-user/SageMaker/mcp-isolated-jupyter-runtime \
+  /home/ec2-user/SageMaker/logs/jupyter-mcp.log 2>/dev/null || true
+
+MCP_TOKEN=$(cat ~/SageMaker/mcp-isolated-token)
+mkdir -p ~/SageMaker/mcp-isolated-jupyter-{config,data,runtime} ~/SageMaker/logs
+JUPYTER_CONFIG_DIR=/home/ec2-user/SageMaker/mcp-isolated-jupyter-config \
+JUPYTER_DATA_DIR=/home/ec2-user/SageMaker/mcp-isolated-jupyter-data \
+JUPYTER_RUNTIME_DIR=/home/ec2-user/SageMaker/mcp-isolated-jupyter-runtime \
+nohup /home/ec2-user/SageMaker/mcp-isolated-env/bin/jupyter server \
+  --ServerApp.ip=127.0.0.1 \
+  --ServerApp.port=8889 \
+  --IdentityProvider.token="$MCP_TOKEN" \
+  --ServerApp.password='' \
+  --ServerApp.disable_check_xsrf=True \
+  --ServerApp.open_browser=False \
+  --ServerApp.root_dir=/home/ec2-user/SageMaker \
+  --ServerApp.kernel_spec_manager_class=jupyter_client.kernelspec.KernelSpecManager \
+  >> ~/SageMaker/logs/jupyter-mcp.log 2>&1 &
+
+sleep 3
+# Verify it's up
+curl -s "http://127.0.0.1:8889/mcp/healthz" \
+  -H "Authorization: token $(cat ~/SageMaker/mcp-isolated-token)"
+# Expected: {"status":"healthy",...}
+```
+
+---
+
+## Manual MCP Server Restart
+
+After any `systemctl restart jupyter-server` (which kills the MCP server), restart the MCP server:
+
+```bash
+# Kill stale process if any
+pkill -u ec2-user -f "jupyter.*8889" 2>/dev/null || true
+sleep 2
+
+MCP_TOKEN=$(cat ~/SageMaker/mcp-isolated-token)
+JUPYTER_CONFIG_DIR=/home/ec2-user/SageMaker/mcp-isolated-jupyter-config \
+JUPYTER_DATA_DIR=/home/ec2-user/SageMaker/mcp-isolated-jupyter-data \
+JUPYTER_RUNTIME_DIR=/home/ec2-user/SageMaker/mcp-isolated-jupyter-runtime \
+nohup /home/ec2-user/SageMaker/mcp-isolated-env/bin/jupyter server \
+  --ServerApp.ip=127.0.0.1 \
+  --ServerApp.port=8889 \
+  --IdentityProvider.token="$MCP_TOKEN" \
+  --ServerApp.password='' \
+  --ServerApp.disable_check_xsrf=True \
+  --ServerApp.open_browser=False \
+  --ServerApp.root_dir=/home/ec2-user/SageMaker \
+  --ServerApp.kernel_spec_manager_class=jupyter_client.kernelspec.KernelSpecManager \
+  >> ~/SageMaker/logs/jupyter-mcp.log 2>&1 &
+
+sleep 3
+ss -tlnp | grep 8889
+# Expected: LISTEN 0 128 127.0.0.1:8889 ...
+```
+
+Then open a **new chat session** in the plugin (old sessions cached the failed connection).
 
 ---
 
 ## Troubleshooting
 
-### The Claude icon does not appear in the sidebar
+### `/mcp` returns 404 even though extension is listed as enabled
 
-```bash
-# 1. Confirm extension is enabled
-jupyter labextension list | grep claude
-# Must show: @dckartasoft/jupyter-claude  enabled OK
+**Cause**: `JUPYTER_NO_CONFIG=1` was used (suppresses runtime Tornado handler registration even though static `extension list` still shows enabled). Or the extension is not loading.
 
-# 2. Check for page_config.json disabling it
-cat "$(python -c 'import sys; print(sys.prefix)')/etc/jupyter/labconfig/page_config.json"
-# dckartasoft-jupyter-claude must NOT appear in disabledExtensions or lockedExtensions
-# If it does: echo '{"disabledExtensions":{},"lockedExtensions":{}}' > <that path>
-# Then restart the Jupyter server
-```
+**Fix**: Do NOT use `JUPYTER_NO_CONFIG=1`. Instead use `--ServerApp.kernel_spec_manager_class=jupyter_client.kernelspec.KernelSpecManager` to override the environment_kernels conflict.
 
-### "Connected" banner never appears / red error
-
-```bash
-# Check the server log
-sudo journalctl -u jupyter-server -n 50 --no-pager
-# or
-tail -100 /var/log/jupyter.log 2>/dev/null || journalctl -u jupyter-server -n 100
-```
-
-Common causes on SageMaker:
-
-| Symptom in log                               | Cause                                             | Fix                                                                           |
-| -------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `AccessDeniedException: bedrock:InvokeModel` | Execution role missing Bedrock policy             | Ask admin to attach the policy                                                |
-| `Could not connect to MCP server`            | `jupyter_mcp_server` not installed or not running | Re-run`pip install --pre jupyter-claude-plugin` and restart                   |
-| `NoCredentialError`                          | `aws_profile` set to a value that doesn't exist   | Remove`aws_profile` from config — leave it empty                              |
-| `EndpointResolutionError`                    | Wrong`aws_region`                                 | Confirm Bedrock is enabled in that region; us-east-2 is the governance region |
-
-### CloudWatch logs not appearing
-
-```bash
-# Check the execution role has the logging policy attached
-aws iam list-attached-role-policies \
-  --role-name <your-execution-role-name> \
-  --query "AttachedPolicies[?contains(PolicyName,'JupyterClaude')]"
-```
-
-If no policy appears, the `dev-sagemaker-execution-role` CloudFormation stack has not been
-deployed, or the instance is using a different execution role. Contact your AWS admin.
-
-### Plugin installs but `jupyter server extension list` shows "not enabled"
-
-```bash
-jupyter server extension enable jupyter_claude --sys-prefix
-sudo systemctl restart jupyter-server
-```
-
-### `pip install` fails with network error
-
-The instance may be in a VPC without internet access. Options:
-
-- Use a VPC endpoint for PyPI (or a private mirror like CodeArtifact)
-- Ask your admin to allow outbound HTTPS to `pypi.org` from the instance's security group
-- As a workaround, upload the wheel directly (see [Manual file update](#manual-file-update-for-testing-pre-release-changes))
+**Verify**: `curl -s http://127.0.0.1:8889/mcp/healthz -H "Authorization: token $(cat ~/SageMaker/mcp-isolated-token)"` should return JSON.
 
 ---
 
-## Related docs
+### Auth fails (302 HTML redirect instead of JSON)
 
-- [USER_GUIDE.md](USER_GUIDE.md) — general install and usage guide (local dev)
-- [STATUS.md](STATUS.md) — current release state, config surface, uncommitted changes
-- `Claude_Bedrock_CLI/Docs/SAGEMAKER-JUPYTER-INTEGRATION.md` — CloudFormation templates and
-  Sceptre configs required by this setup (admin/infrastructure reference)
+**Cause**: Using deprecated `--ServerApp.token` flag. Jupyter Server 2.x ignores it and uses a random token.
+
+**Fix**: Use `--IdentityProvider.token="$MCP_TOKEN"` instead.
+
+---
+
+### MCP server crashes silently after start
+
+**Cause 1**: Runtime dirs owned by root — ec2-user can't write cookie secret.
+```bash
+sudo chown -R ec2-user:ec2-user \
+  ~/SageMaker/mcp-isolated-jupyter-{config,data,runtime} \
+  ~/SageMaker/logs/jupyter-mcp.log
+```
+
+**Cause 2**: `environment_kernels.EnvironmentKernelSpecManager` error — system `/etc/jupyter/` config references a package not in isolated venv.
+Fix: add `--ServerApp.kernel_spec_manager_class=jupyter_client.kernelspec.KernelSpecManager` to the server start command.
+
+---
+
+### Permission prompt appears when inserting cells
+
+**Cause**: `permission_mode = 'acceptEdits'` — this only auto-approves built-in file writes. MCP tool calls still prompt.
+
+**Fix**: Change to `permission_mode = 'bypassPermissions'` in `jupyter_server_config.py`, then restart primary server and MCP server.
+
+---
+
+### MCP server not running after Stop/Start
+
+**Cause**: Lifecycle script started MCP server before the final `systemctl restart`, which killed it.
+
+**Fix**: Latest `on_start_federated.sh` (step 11) starts the server AFTER all restarts. If running an older version, re-sync from S3 or redeploy via Sceptre.
+
+---
+
+### `mcp[cli]` no matching distribution
+
+**Cause**: Isolated venv was created with system Python (too old). Must use JupyterSystemEnv Python 3.10.
+
+**Fix**: Delete and recreate the venv:
+```bash
+rm -rf ~/SageMaker/mcp-isolated-env
+/home/ec2-user/anaconda3/envs/JupyterSystemEnv/bin/python -m venv ~/SageMaker/mcp-isolated-env
+~/SageMaker/mcp-isolated-env/bin/pip install "jupyter-mcp-server>=0.1.0"
+```
+
+---
+
+## Related Docs
+
+- [USER_GUIDE.md](USER_GUIDE.md) — general install and usage (local dev)
+- `Jupyter-Claude-Federated/sagemaker/on_start_federated.sh` — authoritative lifecycle script
+- `iac_deployment/.../dcdevmlps-v0/Scripts/on_start.sh` — main lifecycle that sources the above
+- `docs/AWS-SUPPORT-INVESTIGATION.md` — original investigation that led to this architecture

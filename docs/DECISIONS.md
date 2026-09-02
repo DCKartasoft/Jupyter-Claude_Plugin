@@ -273,6 +273,52 @@ Category: architecture
 AWS support callback scheduled for 2026-08-25. The `unknown_session` issue is the highest-priority question. The federated architecture (`Jupyter-Claude-Federated` project, Claude Code on desktop connecting via MCP) exists solely to work around this conflict while awaiting a resolution from Datalayer or AWS. This plugin will be revisited when the upstream conflict is resolved.
 Rationale: important to maintain clarity that the plugin is paused on a specific, identified upstream incompatibility — not a fundamental architecture flaw. The plugin code itself is correct and works in local development.
 
+## [2026-09-02 06:00] permission_mode must be `bypassPermissions` on SageMaker (not `acceptEdits`)
+
+Category: architecture
+`acceptEdits` only auto-approves Claude's built-in file-write tools. MCP tool calls (`mcp__jupyter__insert_cell`, `execute_cell`, etc.) are a separate permission category and still prompt even with `acceptEdits`. `bypassPermissions` disables all permission checks including MCP tool calls.
+Rationale: users on SageMaker want cell insert/execute to happen without a dialog. `bypassPermissions` is appropriate here because the user controls the execution environment and has explicitly configured the plugin.
+
+## [2026-09-02 06:00] Isolated MCP server: `--IdentityProvider.token` replaces `--ServerApp.token`
+
+Category: dependency
+Jupyter Server 2.x deprecated `ServerApp.token` in favour of `IdentityProvider.token`. Using `--ServerApp.token` causes a deprecation warning and the value is silently ignored — the server generates its own random token, causing all auth to fail with 302 redirects to the login page.
+Rationale: the `/api/kernels` endpoint worked (returning `[]`) while `/mcp` returned HTML — auth was only working because the API endpoint didn't need auth in that test but /mcp did. Any new Jupyter Server 2.x usage must use `--IdentityProvider.token`.
+
+## [2026-09-02 06:00] Do NOT use `JUPYTER_NO_CONFIG=1` for isolated MCP server
+
+Category: architecture
+`JUPYTER_NO_CONFIG=1` was added to suppress the system-level `environment_kernels.EnvironmentKernelSpecManager` config that crashes the isolated venv. However, it also suppresses the extension Tornado handler registration at runtime — the MCP extension shows as "enabled" in the static `jupyter server extension list` (which reads venv config) but the actual `/mcp` route returns 404.
+Correct fix: pass `--ServerApp.kernel_spec_manager_class=jupyter_client.kernelspec.KernelSpecManager` on the CLI to override the system config value. CLI args take precedence over config files without suppressing extension loading.
+
+## [2026-09-02 06:00] Isolated MCP server dirs must be chowned to ec2-user before server start
+
+Category: process
+The lifecycle script runs as root, creating root-owned dirs/files. `nohup` launched as ec2-user can't write the cookie secret or server-info JSON to root-owned runtime dir, causing silent crash. Fix: `touch "$LOG" && chown ec2-user:ec2-user "$LOG" "$MCP_CONFIG_DIR" "$MCP_DATA_DIR" "$MCP_RUNTIME_DIR"` in lifecycle before MCP server start.
+
+## [2026-09-02 06:00] `sudo` in lifecycle script strips env vars; use `sudo -u ec2-user env VAR=val`
+
+Category: process
+The lifecycle script runs as root. The prefix form `VAR=val sudo -u ec2-user cmd` does NOT pass env vars to the subprocess — sudo strips them. To pass env vars, use `sudo -u ec2-user env VAR=val cmd`. This affects JUPYTER_CONFIG_DIR, JUPYTER_DATA_DIR, JUPYTER_RUNTIME_DIR.
+
+## [2026-09-02 18:00] `WORKLOAD_NAME` variable added to on_start.sh; S3 prefix now uses workload folder name
+
+Category: architecture
+`on_start.sh` previously derived `S3_PREFIX` from `CONDA_ENV_NAME` (e.g., `lbl`), but scripts are uploaded to S3 under the workload folder name (e.g., `dcdevlbl-v0`). Added explicit `WORKLOAD_NAME` variable set to the workload folder name. `S3_PREFIX="${S3_BASE_PREFIX}/${WORKLOAD_NAME}"`. Template uses `<<PAMF>><<VER>>` placeholders. `<<VER>>` includes the leading hyphen (produced by `create_workload.py` as `f"-{ver}"`), so no extra hyphen between PAMF and VER.
+Rationale: mismatch caused S3 script sync to pull from a non-existent prefix, leaving `~/SageMaker/scripts/` empty on every Start.
+
+## [2026-09-02 18:00] `ENABLE_JCF` flag gates JCF plugin lifecycle block in on_start.sh
+
+Category: architecture
+The JCF source block in `on_start.sh` is gated by `[[ "${ENABLE_JCF:-false}" == "true" ]]`. Dev workloads set `export ENABLE_JCF="true"` at the top of the script. The `Wl_template` defaults to `true` for dev; a build-time substitution switch will be added when prod deployment scripting is built.
+Rationale: not all workloads need the plugin; opt-in prevents unnecessary install overhead and allows prod to be controlled explicitly.
+
+## [2026-09-02 18:00] `on_start_federated.sh` must be co-located in workload Scripts/ folder
+
+Category: process
+`on_start_federated.sh` (from `Jupyter-Claude-Federated/sagemaker/`) must be copied into each workload's `Scripts/` directory so the Sceptre hook uploads it to S3 under `files/<<WORKLOAD_NAME>>/Scripts/`. The instance lifecycle syncs that prefix to `~/SageMaker/scripts/`. If the file is missing from the workload Scripts/ folder it will not be in S3 and the JCF block will log a WARNING and skip.
+Rationale: Sceptre hooks upload `--recursive` from the local workload directory; files not present locally are not uploaded.
+
 ## [2026-08-19 09:00] SageMaker deployment + per-user CloudWatch session tracking
 
 Category: scope
