@@ -54,7 +54,7 @@ class ChatWebSocketHandler(JupyterHandler, WebSocketHandler):
         self._jupyter_user = self._resolve_user()
 
         self._mcp_url = cfg.jupyter_mcp_url or self._resolve_mcp_url()
-        self._token = self._resolve_token()
+        self._token = cfg.jupyter_mcp_token or self._resolve_token()
 
         if cfg.cloudwatch_log_group and boto3 is not None:
             region = cfg.cloudwatch_region or cfg.aws_region

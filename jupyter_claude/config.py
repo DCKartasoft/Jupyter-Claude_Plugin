@@ -122,6 +122,16 @@ class ClaudeExtensionApp(ExtensionApp):
         "the running Jupyter server's port and token.",
     )
 
+    jupyter_mcp_token = Unicode(
+        "",
+        config=True,
+        help="Auth token for the Jupyter MCP server. Empty string (default) uses "
+        "the running Jupyter server's own token — correct when the MCP server is "
+        "the same process. Set this when the MCP server runs in a separate isolated "
+        "environment (e.g. on SageMaker, where the MCP server is on port 8889 and "
+        "has its own token distinct from the primary server on 8443).",
+    )
+
     enabled_mcp_servers = List(
         trait=Unicode(),
         default_value=["jupyter"],

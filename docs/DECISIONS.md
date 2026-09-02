@@ -231,6 +231,48 @@ Category: tooling
 Renamed the PyPI project name to `jupyter-claude-plugin` (was `jupyter_claude` — too generic and clashy on PyPI). Internal Python package dir stays `jupyter_claude`; only the distribution name changed. Version bumped to `0.1.0-alpha.1` in `package.json` (PEP 440 canonicalizes to `0.1.0a1`) — signals pre-release so `pip install jupyter-claude-plugin` doesn't grab it without `--pre`. Added `claude-agent-sdk>=0.1`, `jupyter-mcp-server>=1.0`, `jupyter-collaboration>=2.0` to `[project].dependencies` (previously only `jupyter_server` was declared; users had to install runtime deps manually). Moved URLs out of `dynamic` into an explicit `[project.urls]` block (Homepage / Documentation / Repository / Issues / Changelog). Added extra classifiers (Development Status Alpha, Intended Audience, Operating System, Topic). Fixed a build bug: hatchling couldn't auto-discover the wheel package after the rename — added `[tool.hatch.build.targets.wheel] packages = ["jupyter_claude"]`. Verified the resulting wheel (`jupyter_claude_plugin-0.1.0a1-py3-none-any.whl`, 111 KB, 31 files) installs cleanly in a scratch venv: `jupyter server extension list` shows `jupyter_claude 0.1.0a1 OK`, `jupyter labextension list` shows `@dckartasoft/jupyter-claude v0.1.0-alpha.1 enabled OK`, and all runtime imports resolve. Updated `README.md` and `docs/USER_GUIDE.md` install sections to prefer `pip install --pre jupyter-claude-plugin` over source install; source install becomes the dev path. SageMaker setup script in USER_GUIDE simplified to a one-line pip install.
 Rationale: publishing to PyPI turns the SageMaker install from a git clone + Node + jlpm build ordeal into a single `pip install`. Alpha designator (`0.1.0a1`) protects users from a broken preview while letting early adopters opt in with `--pre`. Renaming to `jupyter-claude-plugin` avoids collision with any future generic Jupyter+Claude package and matches the pattern of other JupyterLab extension packages on PyPI.
 
+## [2026-08-20 10:00] Architecture pivot: federated model — Claude Code on desktop, not embedded in JupyterLab
+
+Category: architecture
+Abandoned the approach of installing `jupyter-claude-plugin` (the JupyterLab frontend extension) directly on the SageMaker notebook instance. Switching to a federated model where Claude Code runs on the developer's local desktop and connects to the SageMaker Jupyter environment remotely via MCP.
+Rationale: the labextension install path on SageMaker generated an unmanageable conflict tree — `jupyter-mcp-server>=1.0` depends on `jupyter-server-nbmodel` (Datalayer), which ships a frontend labextension that intercepts notebook document opens and fails with `{"reason": "unknown_session"}` on SageMaker's proxy, causing permanent spinner and "session expired" dialogs. Multiple rounds of workarounds (disabling the extension, page_config.json edits, Y-Doc cache wipes) created more instability. The federated model avoids all frontend conflicts: SageMaker runs only `jupyter-mcp-server` (a lightweight Python server extension with no problematic frontend component), and the Claude Code desktop app handles all UI. The SageMaker `on_start.sh` claude integration block has been commented out for now.
+
+## [2026-08-20 10:30] New project for federated implementation; this project paused
+
+Category: process
+A new separate project (`Jupyter-Claude-Federated`) will implement the federated model (Claude Code on desktop → SSM tunnel → jupyter-mcp-server on SageMaker). This project (`Jupyter-Claude_Plugin`) is paused, not abandoned.
+Rationale: the federated architecture has no dependency on the JupyterLab frontend extension stack, so it should live in its own repo rather than mixing concerns here. This project will be revisited when Datalayer's `jupyter-server-nbmodel` is updated to not conflict with SageMaker's session model. The plugin code is correct and works in local dev — it is only the SageMaker deployment path that is blocked.
+
+## [2026-08-22 00:00] AWS support case filed for `jupyter-server-nbmodel` / SageMaker proxy incompatibility
+
+Category: process
+Filed AWS support case against account `201155390384` on the `@datalayer/jupyter-server-nbmodel` labextension conflict with SageMaker's auth proxy. Core issue: every notebook open triggers a Y-Doc session request that SageMaker's proxy rejects with `{"reason":"unknown_session"}`, causing permanent spinner and "session expired" dialogs. Two days of systematic workaround attempts documented in `docs/AWS-SUPPORT-INVESTIGATION.md`. This is the primary question for the case; SSM tunnel issues are tracked separately in the `Jupyter-Claude-Federated` project.
+Rationale: two days of workaround attempts exhausted all known options without resolving the root cause. AWS input required on whether this is a known incompatibility and whether a fix is planned.
+
+## [2026-09-02 00:00] Plugin approach resumed via isolated MCP server (AWS Support workaround)
+
+Category: architecture
+AWS Support confirmed the unknown_session incompatibility and provided a workaround: run jupyter-mcp-server in a completely isolated Python venv (not JupyterSystemEnv), with all Jupyter config/data/runtime dirs under SageMaker/ so the collaboration stack never touches the primary server. The plugin connects to this isolated server on port 8889 via the new jupyter_mcp_url + jupyter_mcp_token traits.
+Rationale: avoids the collaboration stack on the primary server entirely — no race condition, no scrub required. The plugin runs in JupyterSystemEnv (clean, no collab stack); the isolated server runs in SageMaker/mcp-isolated-env (persistent across Stop/Start).
+
+## [2026-09-02 00:00] `jupyter-mcp-server` moved to optional extra `[mcp-server]`
+
+Category: dependency
+Removed `jupyter-mcp-server>=1.0` from `[project].dependencies`; added as `[project.optional-dependencies] mcp-server`. Default install no longer pulls in the collaboration stack. Users who want the self-contained (non-SageMaker) path use `pip install "jupyter-claude-plugin[mcp-server]"`.
+Rationale: SageMaker deployment requires the collaboration stack to be absent from JupyterSystemEnv. The isolated venv approach handles MCP server installation separately.
+
+## [2026-09-02 00:00] Added `jupyter_mcp_token` trait
+
+Category: architecture
+New `jupyter_mcp_token: Unicode` trait on `ClaudeExtensionApp`. When set, used as the Authorization token for the MCP server instead of the running server's own token. chat_handler.py: `self._token = cfg.jupyter_mcp_token or self._resolve_token()`.
+Rationale: when the MCP server runs in an isolated env on port 8889, it has its own token distinct from the primary Jupyter server (port 8443). The trait lets jupyter_server_config.py supply the correct token at startup.
+
+## [2026-08-25 00:00] `jupyter-server-nbmodel` conflict confirmed as primary blocker; federated approach is a workaround only
+
+Category: architecture
+AWS support callback scheduled for 2026-08-25. The `unknown_session` issue is the highest-priority question. The federated architecture (`Jupyter-Claude-Federated` project, Claude Code on desktop connecting via MCP) exists solely to work around this conflict while awaiting a resolution from Datalayer or AWS. This plugin will be revisited when the upstream conflict is resolved.
+Rationale: important to maintain clarity that the plugin is paused on a specific, identified upstream incompatibility — not a fundamental architecture flaw. The plugin code itself is correct and works in local development.
+
 ## [2026-08-19 09:00] SageMaker deployment + per-user CloudWatch session tracking
 
 Category: scope
