@@ -29,10 +29,16 @@ class ClaudeExtensionApp(ExtensionApp):
         return self._models_json().get("direct", "claude-opus-latest")
 
     aws_region = Unicode(
-        "us-east-1",
         config=True,
-        help="AWS region for the Bedrock backend. Ignored when backend is `anthropic`.",
+        help="AWS region for the Bedrock backend. Ignored when backend is `anthropic`. "
+        "Defaults to `aws_region` in jupyter_claude_models.json, else `us-east-1`. "
+        "Must match the inference-profile prefix of the model IDs (e.g. `eu-` "
+        "profiles for EU regions) to keep inference within the intended geography.",
     )
+
+    @default("aws_region")
+    def _default_aws_region(self):
+        return self._models_json().get("aws_region", "us-east-1")
 
     aws_profile = Unicode(
         "",

@@ -337,3 +337,9 @@ Category: architecture
 Updated all default model IDs from Claude 4 to the Claude 5 family across `config.py` and `plugin.json`. Added `default_fable_model` trait (was referenced in `initialize_settings` but never defined — live `AttributeError`). Introduced `_models_json()` helper that reads `~/.jupyter/jupyter_claude_models.json` at startup; all four tier defaults (`fable`, `opus`, `sonnet`, `haiku`) and the Anthropic-direct `model` default resolve from this file first, falling back to hardcoded Claude 5 IDs. The Anthropic-direct default changed from `claude-opus-4-8` to `claude-opus-latest` so it tracks the current model without requiring package updates.
 New defaults: `direct=claude-opus-latest`, `fable=us.anthropic.claude-fable-5-1`, `opus=us.anthropic.claude-opus-5-5`, `sonnet=us.anthropic.claude-sonnet-5-5`, `haiku=us.anthropic.claude-haiku-5-5`.
 Rationale: Claude 5 family is current; Fable adds a new frontier tier. JSON config file decouples model ID updates from package redistribution — drop `~/.jupyter/jupyter_claude_models.json` on a SageMaker instance to switch all model IDs without reinstalling or redeploying the plugin.
+
+## [2026-10-27] AWS region configurable via models JSON
+
+Category: architecture
+`aws_region` now defaults from the `aws_region` key in `~/.jupyter/jupyter_claude_models.json` (fallback `us-east-1`) via an `@default` hook, like the model IDs. Explicit trait values in `jupyter_server_config.py` still take precedence.
+Rationale: data sovereignty — the region (and matching inference-profile prefix) must be settable per machine without redeploying the package.

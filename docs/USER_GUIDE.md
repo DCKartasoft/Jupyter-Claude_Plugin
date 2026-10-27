@@ -208,9 +208,12 @@ If your Bedrock region uses different inference profile IDs than the defaults, o
   "fable": "us.anthropic.claude-fable-5-1",
   "opus": "us.anthropic.claude-opus-5-5",
   "sonnet": "us.anthropic.claude-sonnet-5-5",
-  "haiku": "us.anthropic.claude-haiku-5-5"
+  "haiku": "us.anthropic.claude-haiku-5-5",
+  "aws_region": "us-east-1"
 }
 ```
+
+`aws_region` sets the Bedrock region (default `us-east-1`). For data-sovereignty requirements, set it together with inference-profile IDs whose prefix matches the geography (e.g. `eu.anthropic...` with an EU region) so inference stays in the intended region.
 
 Any model ID specified in this file overrides the trait default (from `jupyter_server_config.py`) and the hardcoded default in the plugin. This is especially useful on SageMaker or in shared environments where you want region-specific model IDs without reinstalling the package or editing configuration files.
 
