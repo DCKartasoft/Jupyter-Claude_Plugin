@@ -220,7 +220,23 @@ class ClaudeExtensionApp(ExtensionApp):
                 self.log.warning("jupyter_claude: failed to parse %s", path)
         return {}
 
+    # jupyter_claude_models.json key -> trait it overrides.
+    _MODELS_JSON_TRAITS = {
+        "direct": "model",
+        "aws_region": "aws_region",
+        "fable": "default_fable_model",
+        "opus": "default_opus_model",
+        "sonnet": "default_sonnet_model",
+        "haiku": "default_haiku_model",
+    }
+
     def initialize_settings(self):
+        # The models JSON wins over traits set in jupyter_server_config.py, so a
+        # stale config file cannot silently override the per-machine region/models.
+        for key, value in self._models_json().items():
+            trait = self._MODELS_JSON_TRAITS.get(key)
+            if trait and isinstance(value, str) and value:
+                setattr(self, trait, value)
         self.settings["jclaude_config"] = self
         if self.backend == "bedrock":
             self.log.info(

@@ -341,5 +341,5 @@ Rationale: Claude 5 family is current; Fable adds a new frontier tier. JSON conf
 ## [2026-10-27] AWS region configurable via models JSON
 
 Category: architecture
-`aws_region` now defaults from the `aws_region` key in `~/.jupyter/jupyter_claude_models.json` (fallback `us-east-1`) via an `@default` hook, like the model IDs. Explicit trait values in `jupyter_server_config.py` still take precedence.
+`aws_region` now defaults from the `aws_region` key in `~/.jupyter/jupyter_claude_models.json` (fallback `us-east-1`) via an `@default` hook, like the model IDs. The JSON file takes precedence over explicit traits in `jupyter_server_config.py`: `initialize_settings` applies its keys (`direct`, `aws_region`, `fable`, `opus`, `sonnet`, `haiku`) over the trait values, so a stale server config cannot silently override the per-machine region or models.
 Rationale: data sovereignty — the region (and matching inference-profile prefix) must be settable per machine without redeploying the package.
