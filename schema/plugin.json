@@ -49,9 +49,9 @@
     },
     "model": {
       "type": "string",
-      "default": "claude-opus-4-8",
+      "default": "claude-opus-latest",
       "title": "Model",
-      "description": "Model ID. Plain name for anthropic (e.g. `claude-opus-4-8`); cross-region inference profile for bedrock (e.g. `us.anthropic.claude-opus-4-8`)."
+      "description": "Model ID. Plain name for anthropic (e.g. `claude-opus-latest`); cross-region inference profile for bedrock (e.g. `us.anthropic.claude-opus-5-5`)."
     },
     "awsRegion": {
       "type": "string",
@@ -65,27 +65,33 @@
       "title": "AWS profile",
       "description": "AWS named profile for the Bedrock backend (from ~/.aws/config). Uses shared SSO credentials when set. Empty means fall back to the Jupyter process's environment."
     },
+    "defaultFableModel": {
+      "type": "string",
+      "default": "us.anthropic.claude-fable-5-1",
+      "title": "Default Fable model (Bedrock)",
+      "description": "Bedrock inference-profile ID for the Fable tier."
+    },
     "defaultOpusModel": {
       "type": "string",
-      "default": "us.anthropic.claude-opus-4-7",
+      "default": "us.anthropic.claude-opus-5-5",
       "title": "Default Opus model (Bedrock)",
       "description": "Bedrock inference-profile ID for the Opus tier."
     },
     "defaultSonnetModel": {
       "type": "string",
-      "default": "us.anthropic.claude-sonnet-4-6",
+      "default": "us.anthropic.claude-sonnet-5-5",
       "title": "Default Sonnet model (Bedrock)",
       "description": "Bedrock inference-profile ID for the Sonnet tier."
     },
     "defaultHaikuModel": {
       "type": "string",
-      "default": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "default": "us.anthropic.claude-haiku-5-5",
       "title": "Default Haiku model (Bedrock)",
       "description": "Bedrock inference-profile ID for the Haiku tier."
     },
     "mainModelTier": {
       "type": "string",
-      "enum": ["opus", "sonnet", "haiku"],
+      "enum": ["fable", "opus", "sonnet", "haiku"],
       "default": "sonnet",
       "title": "Main model tier (Bedrock)",
       "description": "Which tier runs the main conversation. `opus` is highest quality but slowest; `sonnet` (default) is a good balance; `haiku` is fastest."

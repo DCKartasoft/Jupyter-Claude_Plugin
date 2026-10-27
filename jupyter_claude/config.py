@@ -85,7 +85,7 @@ class ClaudeExtensionApp(ExtensionApp):
         return self._models_json().get("haiku", "us.anthropic.claude-haiku-5-5")
 
     main_model_tier = Enum(
-        ["fable","opus", "sonnet", "haiku"],
+        ["fable", "opus", "sonnet", "haiku"],
         default_value="sonnet",
         config=True,
         help="Which tier the main conversation model runs on. `opus` is "
@@ -219,7 +219,7 @@ class ClaudeExtensionApp(ExtensionApp):
         if self.backend == "bedrock":
             self.log.info(
                 "jupyter_claude configured: backend=bedrock region=%s profile=%s "
-                "fable=%sopus=%s sonnet=%s haiku=%s",
+                "fable=%s opus=%s sonnet=%s haiku=%s",
                 self.aws_region,
                 self.aws_profile or "<from process env>",
                 self.default_fable_model,
