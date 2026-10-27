@@ -1,0 +1,8 @@
+{
+  "aws_region": "us-east-1",
+  "direct": "claude-opus-latest",
+  "fable": "us.anthropic.claude-fable-5-1",
+  "opus": "us.anthropic.claude-opus-5-5",
+  "sonnet": "us.anthropic.claude-sonnet-5-5",
+  "haiku": "us.anthropic.claude-haiku-5-5"
+}

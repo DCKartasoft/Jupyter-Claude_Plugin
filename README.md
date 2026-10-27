@@ -65,7 +65,7 @@ The extension supports two Claude backends. Pick one in the JupyterLab Settings 
 
 ### Anthropic direct
 
-Set `ANTHROPIC_API_KEY` in the environment before launching Jupyter. The extension will use the `model` trait (default `claude-opus-4-8`).
+Set `ANTHROPIC_API_KEY` in the environment before launching Jupyter. The extension will use the `model` trait (default `claude-opus-latest`).
 
 ### AWS Bedrock via shared SSO
 
@@ -74,7 +74,7 @@ Configuration lives in the extension traits (not shell env — the extension wri
 - `backend = "bedrock"`
 - `aws_region = "us-east-1"` (or your region)
 - `aws_profile = "<your profile>"` — a named profile from `~/.aws/config` (enables shared AWS SSO; profile and region are forwarded to the SDK subprocess)
-- `default_opus_model`, `default_sonnet_model`, `default_haiku_model` — inference-profile model IDs (defaults: `us.anthropic.claude-opus-4-7`, `us.anthropic.claude-sonnet-4-6`, `us.anthropic.claude-haiku-4-5-20251001-v1:0`)
+- `default_fable_model`, `default_opus_model`, `default_sonnet_model`, `default_haiku_model` — inference-profile model IDs (defaults: `us.anthropic.claude-fable-5-1`, `us.anthropic.claude-opus-5-5`, `us.anthropic.claude-sonnet-5-5`, `us.anthropic.claude-haiku-5-5`)
 
 Refresh your SSO session and start Jupyter with `aws-vault` so the subprocess inherits temporary STS credentials without leaking them to disk:
 
@@ -84,6 +84,32 @@ aws-vault exec <your profile> -- jupyter lab
 ```
 
 If you prefer not to use `aws-vault`, `AWS_PROFILE=<name> AWS_REGION=<region> jupyter lab` also works — the extension forwards those to the SDK.
+
+### Per-machine model and region config (`jupyter_claude_models.json`)
+
+To set the AWS region and model IDs for a machine without reinstalling the plugin or editing `jupyter_server_config.py`, create `~/.jupyter/jupyter_claude_models.json`. A ready-to-edit copy is at [examples/jupyter_claude_models.json](examples/jupyter_claude_models.json) (on GitHub, open it and use **Download raw file**):
+
+```json
+{
+  "aws_region": "us-east-1",
+  "direct": "claude-opus-latest",
+  "fable": "us.anthropic.claude-fable-5-1",
+  "opus": "us.anthropic.claude-opus-5-5",
+  "sonnet": "us.anthropic.claude-sonnet-5-5",
+  "haiku": "us.anthropic.claude-haiku-5-5"
+}
+```
+
+| Key | Overrides | Used when |
+|---|---|---|
+| `aws_region` | `aws_region` | Bedrock backend |
+| `direct` | `model` | Anthropic direct backend |
+| `fable`, `opus`, `sonnet`, `haiku` | `default_<tier>_model` | Bedrock backend (inference-profile IDs) |
+
+- All keys are optional; omitted keys fall back to the built-in defaults.
+- Values in this file **take precedence** over the same settings in `jupyter_server_config.py`.
+- The file is read at server startup — restart Jupyter after editing it.
+- **Data sovereignty:** keep the region and the inference-profile prefix consistent (e.g. `eu-west-1` with `eu.anthropic...` IDs). The default `us.` profiles route across US regions. List the profiles available in your region with `aws bedrock list-inference-profiles --region <region>`.
 
 See [docs/PLAN.md](docs/PLAN.md) for design details.
 
