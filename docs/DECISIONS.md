@@ -330,3 +330,10 @@ Rationale: Bedrock invocation logs record the execution role ARN, not the indivi
 Category: architecture
 `on_start_federated.sh` step 9b reads `~/SageMaker/config/jcf-system-prompt.md` (synced from `s3://.../files/<WORKLOAD_NAME>/Config/`) and, if present, appends `c.ClaudeExtensionApp.system_prompt = """..."""` into the `[jcf-begin]/[jcf-end]` block in `jupyter_server_config.py`. The file is optional — if absent the plugin uses its built-in default. `Wl_template/Config/jcf-system-prompt.md` contains the base template with `<<MF>>` and `<<PAMF>><<VER>>` placeholders; each deployed workload gets a concrete copy in its `Config/` folder for customisation.
 Rationale: allows each workload to carry a tailored system prompt (dataset locations, conventions, domain context) without plugin code changes. Prompt is live-updatable by editing the S3 file and restarting the instance — no redeploy needed.
+
+## [2026-10-26 10:00] Model IDs updated to Claude 5 family + JSON override file
+
+Category: architecture
+Updated all default model IDs from Claude 4 to the Claude 5 family across `config.py` and `plugin.json`. Added `default_fable_model` trait (was referenced in `initialize_settings` but never defined — live `AttributeError`). Introduced `_models_json()` helper that reads `~/.jupyter/jupyter_claude_models.json` at startup; all four tier defaults (`fable`, `opus`, `sonnet`, `haiku`) and the Anthropic-direct `model` default resolve from this file first, falling back to hardcoded Claude 5 IDs. The Anthropic-direct default changed from `claude-opus-4-8` to `claude-opus-latest` so it tracks the current model without requiring package updates.
+New defaults: `direct=claude-opus-latest`, `fable=us.anthropic.claude-fable-5-1`, `opus=us.anthropic.claude-opus-5-5`, `sonnet=us.anthropic.claude-sonnet-5-5`, `haiku=us.anthropic.claude-haiku-5-5`.
+Rationale: Claude 5 family is current; Fable adds a new frontier tier. JSON config file decouples model ID updates from package redistribution — drop `~/.jupyter/jupyter_claude_models.json` on a SageMaker instance to switch all model IDs without reinstalling or redeploying the plugin.

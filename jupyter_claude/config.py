@@ -1,5 +1,8 @@
+import json
+from pathlib import Path
+
 from jupyter_server.extension.application import ExtensionApp
-from traitlets import Bool, Enum, Int, List, Unicode
+from traitlets import Bool, Enum, Int, List, Unicode, default
 
 
 class ClaudeExtensionApp(ExtensionApp):
@@ -15,12 +18,15 @@ class ClaudeExtensionApp(ExtensionApp):
     )
 
     model = Unicode(
-        "claude-opus-4-8",
         config=True,
         help="Model identifier. For `anthropic` backend, use a plain model name "
-        "(e.g. `claude-opus-4-8`). For `bedrock`, use a cross-region inference "
-        "profile ID (e.g. `us.anthropic.claude-opus-4-8`).",
+        "(e.g. `claude-opus-latest`). For `bedrock`, use a cross-region inference "
+        "profile ID (e.g. `us.anthropic.claude-opus-5-5`).",
     )
+
+    @default("model")
+    def _default_model(self):
+        return self._models_json().get("direct", "claude-opus-latest")
 
     aws_region = Unicode(
         "us-east-1",
@@ -38,29 +44,48 @@ class ClaudeExtensionApp(ExtensionApp):
         "`anthropic`.",
     )
 
+    default_fable_model = Unicode(
+        config=True,
+        help="Bedrock inference-profile ID for the Fable tier. Used only when "
+        "backend is `bedrock`.",
+    )
+
+    @default("default_fable_model")
+    def _default_fable_model(self):
+        return self._models_json().get("fable", "us.anthropic.claude-fable-5-1")
+
     default_opus_model = Unicode(
-        "us.anthropic.claude-opus-4-7",
         config=True,
         help="Bedrock inference-profile ID for the Opus tier. Used only when "
         "backend is `bedrock`.",
     )
 
+    @default("default_opus_model")
+    def _default_opus_model(self):
+        return self._models_json().get("opus", "us.anthropic.claude-opus-5-5")
+
     default_sonnet_model = Unicode(
-        "us.anthropic.claude-sonnet-4-6",
         config=True,
         help="Bedrock inference-profile ID for the Sonnet tier. Used only when "
         "backend is `bedrock`.",
     )
 
+    @default("default_sonnet_model")
+    def _default_sonnet_model(self):
+        return self._models_json().get("sonnet", "us.anthropic.claude-sonnet-5-5")
+
     default_haiku_model = Unicode(
-        "us.anthropic.claude-haiku-4-5-20251001-v1:0",
         config=True,
         help="Bedrock inference-profile ID for the Haiku tier. Used only when "
         "backend is `bedrock`.",
     )
 
+    @default("default_haiku_model")
+    def _default_haiku_model(self):
+        return self._models_json().get("haiku", "us.anthropic.claude-haiku-5-5")
+
     main_model_tier = Enum(
-        ["opus", "sonnet", "haiku"],
+        ["fable","opus", "sonnet", "haiku"],
         default_value="sonnet",
         config=True,
         help="Which tier the main conversation model runs on. `opus` is "
@@ -176,14 +201,28 @@ class ClaudeExtensionApp(ExtensionApp):
         "stacks in us-east-2).",
     )
 
+    def _models_json(self):
+        try:
+            from jupyter_core.paths import jupyter_config_dir
+            path = Path(jupyter_config_dir()) / "jupyter_claude_models.json"
+        except Exception:
+            path = Path.home() / ".jupyter" / "jupyter_claude_models.json"
+        if path.exists():
+            try:
+                return json.loads(path.read_text())
+            except Exception:
+                self.log.warning("jupyter_claude: failed to parse %s", path)
+        return {}
+
     def initialize_settings(self):
         self.settings["jclaude_config"] = self
         if self.backend == "bedrock":
             self.log.info(
                 "jupyter_claude configured: backend=bedrock region=%s profile=%s "
-                "opus=%s sonnet=%s haiku=%s",
+                "fable=%sopus=%s sonnet=%s haiku=%s",
                 self.aws_region,
                 self.aws_profile or "<from process env>",
+                self.default_fable_model,
                 self.default_opus_model,
                 self.default_sonnet_model,
                 self.default_haiku_model,

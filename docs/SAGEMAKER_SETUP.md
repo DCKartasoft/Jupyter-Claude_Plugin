@@ -135,6 +135,8 @@ c.ClaudeExtensionApp.cloudwatch_log_group = '/aws/jupyter-claude/sessions'
 PYEOF
 ```
 
+**Note on region-specific model IDs:** If your Bedrock region uses different inference-profile IDs than the defaults (Claude 5 family in `us-east-1`), create `~/.jupyter/jupyter_claude_models.json` instead of modifying `jupyter_server_config.py` traits. Look up your region's profiles with `aws bedrock list-inference-profiles --region <your-region>` and set them in the JSON file — this persists across plugin updates without reinstalling.
+
 ### 6. Restart primary server
 
 ```bash

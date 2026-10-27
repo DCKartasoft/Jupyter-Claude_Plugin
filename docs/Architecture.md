@@ -44,16 +44,19 @@ JupyterLab (browser)
 
 Backend is env-var driven inside the Agent SDK at query time:
 
-- **Anthropic direct**: `ANTHROPIC_API_KEY` in process env; uses model IDs like `claude-opus-4-8`; `model` trait picked from config.
+- **Anthropic direct**: `ANTHROPIC_API_KEY` in process env; uses model IDs like `claude-opus-latest` (Claude 5 default); `model` trait picked from config, overridable by `~/.jupyter/jupyter_claude_models.json`.
 
 - **AWS Bedrock**: `CLAUDE_CODE_USE_BEDROCK=1` + `AWS_REGION` + AWS credentials + AWS SSO profile name. Server extension sets:
-  - `ANTHROPIC_DEFAULT_OPUS_MODEL` (default `us.anthropic.claude-opus-4-7`)
-  - `ANTHROPIC_DEFAULT_SONNET_MODEL` (default `us.anthropic.claude-sonnet-4-6`)
-  - `ANTHROPIC_DEFAULT_HAIKU_MODEL` (default `us.anthropic.claude-haiku-4-5-20251001-v1:0`)
+  - `ANTHROPIC_DEFAULT_FABLE_MODEL` (default `us.anthropic.claude-fable-5-1`)
+  - `ANTHROPIC_DEFAULT_OPUS_MODEL` (default `us.anthropic.claude-opus-5-5`)
+  - `ANTHROPIC_DEFAULT_SONNET_MODEL` (default `us.anthropic.claude-sonnet-5-5`)
+  - `ANTHROPIC_DEFAULT_HAIKU_MODEL` (default `us.anthropic.claude-haiku-5-5`)
   - `ANTHROPIC_MODEL` to the selected tier's inference-profile ID (active tier resolved from `main_model_tier` trait or user's runtime selection)
   - `AWS_PROFILE` from `aws_profile` trait; enables shared AWS SSO lookup.
 
-Default tier is `main_model_tier` trait (default `sonnet`); user can switch per-conversation via the tier selector in the chat panel. Configuration is set via `jupyter_server_config.py` or the JupyterLab Settings Editor (schema in `schema/plugin.json`).
+Model IDs are resolved in order: `~/.jupyter/jupyter_claude_models.json` (if present) → trait value (if set in `jupyter_server_config.py`) → hardcoded Claude 5 defaults. This allows runtime override without package reinstall.
+
+Default tier is `main_model_tier` trait (default `sonnet`); user can switch per-conversation via the tier selector in the chat panel. Tier options are now `fable` (fastest), `sonnet` (balanced, default), `opus` (stronger), `haiku` (compact). Configuration is set via `jupyter_server_config.py` or the JupyterLab Settings Editor (schema in `schema/plugin.json`).
 
 ## MCP tool visibility
 

@@ -28,7 +28,7 @@ Install and use the Jupyter Claude extension in your own JupyterLab environment.
   - **Explain this cell with Claude** — inserts a markdown cell above the current one describing what the code does.
   - **Fix last error with Claude** — after a cell raises, Claude sees the traceback and inserts a corrected cell below.
   - **MCP servers…** — choose which MCP servers Claude is allowed to use (from your `~/.claude.json`).
-- **Model tier selector** in the panel header — flip between Opus / Sonnet / Haiku mid-session. Sonnet is the default for speed; switch to Opus for harder reasoning.
+- **Model tier selector** in the panel header — flip between Fable / Opus / Sonnet / Haiku mid-session. Sonnet is the default for speed; switch to Opus for harder reasoning or Fable for faster responses.
 
 ## Requirements
 
@@ -88,7 +88,7 @@ The extension needs to know how to reach Claude. Put your choice in `~/.jupyter/
 ```python
 c = get_config()  # noqa
 c.ClaudeExtensionApp.backend = "anthropic"
-c.ClaudeExtensionApp.model = "claude-opus-4-8"   # or any Anthropic model id
+c.ClaudeExtensionApp.model = "claude-opus-latest"   # or any Anthropic model id
 c.ClaudeExtensionApp.permission_mode = "acceptEdits"
 ```
 
@@ -103,9 +103,10 @@ c.ClaudeExtensionApp.aws_region = "us-east-1"
 c.ClaudeExtensionApp.aws_profile = "<your-sso-profile-name>"
 
 # These are the current defaults for Bedrock — override if your account has different profiles
-c.ClaudeExtensionApp.default_opus_model = "us.anthropic.claude-opus-4-7"
-c.ClaudeExtensionApp.default_sonnet_model = "us.anthropic.claude-sonnet-4-6"
-c.ClaudeExtensionApp.default_haiku_model = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+c.ClaudeExtensionApp.default_opus_model = "us.anthropic.claude-opus-5-5"
+c.ClaudeExtensionApp.default_sonnet_model = "us.anthropic.claude-sonnet-5-5"
+c.ClaudeExtensionApp.default_fable_model = "us.anthropic.claude-fable-5-1"
+c.ClaudeExtensionApp.default_haiku_model = "us.anthropic.claude-haiku-5-5"
 
 c.ClaudeExtensionApp.permission_mode = "acceptEdits"
 ```
@@ -134,7 +135,7 @@ AWS_PROFILE=<your-sso-profile-name> AWS_REGION=us-east-1 jupyter lab
 
 (For Anthropic direct, just `jupyter lab` after exporting `ANTHROPIC_API_KEY`.)
 
-Open the URL Jupyter prints. Look for the **Claude icon** in the right sidebar. Click it to reveal the chat panel — the top line should read `Connected — bedrock / us.anthropic.claude-sonnet-4-6` (or the equivalent for your setup).
+Open the URL Jupyter prints. Look for the **Claude icon** in the right sidebar. Click it to reveal the chat panel — the top line should read `Connected — bedrock / us.anthropic.claude-sonnet-5-5` (or the equivalent for your setup).
 
 ## Using the extension
 
@@ -183,18 +184,37 @@ Every setting is a trait on `ClaudeExtensionApp` and configurable via `jupyter_s
 | Trait                  | Type                                                                | Default                                         | Notes                                                                                                 |
 | ---------------------- | ------------------------------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `backend`              | `"anthropic"` \| `"bedrock"`                                        | `"anthropic"`                                   | Which API to talk to                                                                                  |
-| `model`                | str                                                                 | `"claude-opus-4-8"`                             | Anthropic-direct only; unused for Bedrock                                                             |
+| `model`                | str                                                                 | `"claude-opus-latest"`                          | Anthropic-direct only; unused for Bedrock                                                             |
 | `aws_region`           | str                                                                 | `"us-east-1"`                                   | Bedrock region                                                                                        |
 | `aws_profile`          | str                                                                 | `""`                                            | Named profile from `~/.aws/config`; empty = use process env                                           |
-| `default_opus_model`   | str                                                                 | `"us.anthropic.claude-opus-4-7"`                | Bedrock inference profile                                                                             |
-| `default_sonnet_model` | str                                                                 | `"us.anthropic.claude-sonnet-4-6"`              | Bedrock inference profile                                                                             |
-| `default_haiku_model`  | str                                                                 | `"us.anthropic.claude-haiku-4-5-20251001-v1:0"` | Bedrock inference profile                                                                             |
-| `main_model_tier`      | `"opus"` \| `"sonnet"` \| `"haiku"`                                 | `"sonnet"`                                      | Default tier when the panel first opens                                                               |
+| `default_fable_model`  | str                                                                 | `"us.anthropic.claude-fable-5-1"`               | Bedrock inference profile (new fourth tier)                                                           |
+| `default_opus_model`   | str                                                                 | `"us.anthropic.claude-opus-5-5"`                | Bedrock inference profile                                                                             |
+| `default_sonnet_model` | str                                                                 | `"us.anthropic.claude-sonnet-5-5"`              | Bedrock inference profile                                                                             |
+| `default_haiku_model`  | str                                                                 | `"us.anthropic.claude-haiku-5-5"`               | Bedrock inference profile                                                                             |
+| `main_model_tier`      | `"fable"` \| `"opus"` \| `"sonnet"` \| `"haiku"`                   | `"sonnet"`                                      | Default tier when the panel first opens                                                               |
 | `system_prompt`        | str                                                                 | see `config.py`                                 | Prepended to every conversation                                                                       |
 | `permission_mode`      | `"default"` \| `"acceptEdits"` \| `"plan"` \| `"bypassPermissions"` | `"default"`                                     | `acceptEdits` skips confirmation dialogs when Claude uses MCP tools; `bypassPermissions` is dangerous |
 | `enabled_mcp_servers`  | list[str]                                                           | `["jupyter"]`                                   | Which MCP servers Claude may call. `jupyter` is always forced-included                                |
 | `jupyter_mcp_url`      | str                                                                 | `""`                                            | Empty = auto-detect from Jupyter's port                                                               |
 | `verbose`              | bool                                                                | `False`                                         | Log every SDK message at INFO                                                                         |
+
+### Override model IDs without reinstalling
+
+If your Bedrock region uses different inference profile IDs than the defaults, or you want to pin specific model versions for Anthropic direct, create `~/.jupyter/jupyter_claude_models.json`:
+
+```json
+{
+  "direct": "claude-opus-latest",
+  "fable": "us.anthropic.claude-fable-5-1",
+  "opus": "us.anthropic.claude-opus-5-5",
+  "sonnet": "us.anthropic.claude-sonnet-5-5",
+  "haiku": "us.anthropic.claude-haiku-5-5"
+}
+```
+
+Any model ID specified in this file overrides the trait default (from `jupyter_server_config.py`) and the hardcoded default in the plugin. This is especially useful on SageMaker or in shared environments where you want region-specific model IDs without reinstalling the package or editing configuration files.
+
+The file is **optional**; if absent, the plugin uses trait values (if set) or hardcoded Claude 5 defaults.
 
 ## Running on AWS SageMaker
 
@@ -275,7 +295,7 @@ EOF
 - **`aws_profile` must be empty.** Named profiles look up `~/.aws/credentials`, which the SageMaker execution role doesn't populate. Leave the trait blank so the standard AWS credential chain finds the instance metadata.
 - **`~/.claude.json` won't exist** on a fresh space, so the "MCP servers…" picker shows only `jupyter`. That's fine — Jupyter MCP is all you need for cell R/W/execute. If you want additional MCP servers, run `claude mcp add --scope user <name> -- <cmd>` inside the space.
 - **Studio environments are ephemeral.** Pip installs into the space's Python env don't survive restarts unless persisted. Put the `pip install --pre jupyter-claude-plugin` line in a lifecycle configuration so it re-runs on each space startup, or bake the extension into a custom Studio image for zero-latency startup.
-- **Bedrock model IDs are region-specific.** The defaults in `config.py` target `us-east-1`. In other regions, look up the correct inference-profile IDs with `aws bedrock list-inference-profiles --region <your-region>` and override the three `default_*_model` traits.
+- **Bedrock model IDs are region-specific.** The defaults in `config.py` target `us-east-1`. In other regions, look up the correct inference-profile IDs with `aws bedrock list-inference-profiles --region <your-region>` and use `~/.jupyter/jupyter_claude_models.json` to override them without reinstalling the package.
 - **Egress:** Bedrock is reached via AWS-internal endpoints, so no VPC egress rules to loosen. This is one advantage over Anthropic direct on SageMaker.
 
 ## Troubleshooting
