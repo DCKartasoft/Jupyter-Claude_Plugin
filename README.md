@@ -96,7 +96,8 @@ To set the AWS region and model IDs for a machine without reinstalling the plugi
   "fable": "us.anthropic.claude-fable-5-1",
   "opus": "us.anthropic.claude-opus-5-5",
   "sonnet": "us.anthropic.claude-sonnet-5-5",
-  "haiku": "us.anthropic.claude-haiku-5-5"
+  "haiku": "us.anthropic.claude-haiku-5-5",
+  "tiers": ["opus", "sonnet", "haiku"]
 }
 ```
 
@@ -105,8 +106,10 @@ To set the AWS region and model IDs for a machine without reinstalling the plugi
 | `aws_region` | `aws_region` | Bedrock backend |
 | `direct` | `model` | Anthropic direct backend |
 | `fable`, `opus`, `sonnet`, `haiku` | `default_<tier>_model` | Bedrock backend (inference-profile IDs) |
+| `tiers` | `available_tiers` | Bedrock backend — which tiers appear in the model picker and can be selected |
 
 - All keys are optional; omitted keys fall back to the built-in defaults.
+- `tiers` controls the model picker: only listed tiers are shown and accepted. Valid names are `fable`, `opus`, `sonnet`, `haiku`; unknown names are ignored. Default is `["opus", "sonnet", "haiku"]` — `fable` is opt-in. If `main_model_tier` isn't in the list, the plugin falls back to `sonnet`, then `haiku`, `opus`, `fable` (whichever is first allowed) and logs a warning.
 - Values in this file **take precedence** over the same settings in `jupyter_server_config.py`.
 - The file is read at server startup — restart Jupyter after editing it.
 - **Data sovereignty:** keep the region and the inference-profile prefix consistent (e.g. `eu-west-1` with `eu.anthropic...` IDs). The default `us.` profiles route across US regions. List the profiles available in your region with `aws bedrock list-inference-profiles --region <region>`.

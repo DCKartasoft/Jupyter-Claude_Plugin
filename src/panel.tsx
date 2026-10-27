@@ -2,7 +2,7 @@ import { ReactWidget } from '@jupyterlab/apputils';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { claudeIcon } from './icons';
-import { ChatClient, ServerMessage } from './ws';
+import { ChatClient, ServerMessage, Tier } from './ws';
 
 interface IDisplayMessage {
   role: 'user' | 'assistant' | 'system' | 'tool';
@@ -13,7 +13,8 @@ interface IDisplayMessage {
 let _idSeed = 0;
 const nextId = (): string => `m${++_idSeed}`;
 
-const TIERS: Array<'opus' | 'sonnet' | 'haiku'> = ['opus', 'sonnet', 'haiku'];
+// Shown until the server's `ready` message supplies the configured list.
+const DEFAULT_TIERS: Tier[] = ['opus', 'sonnet', 'haiku'];
 
 interface IChatUIProps {
   client: ChatClient;
@@ -26,7 +27,8 @@ function ChatUI(props: IChatUIProps): JSX.Element {
   const [messages, setMessages] = useState<IDisplayMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
-  const [tier, setTier] = useState<'opus' | 'sonnet' | 'haiku'>('sonnet');
+  const [tier, setTier] = useState<Tier>('sonnet');
+  const [availableTiers, setAvailableTiers] = useState<Tier[]>(DEFAULT_TIERS);
   const [modelLabel, setModelLabel] = useState<string>('');
   const [backend, setBackend] = useState<string>('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -38,7 +40,8 @@ function ChatUI(props: IChatUIProps): JSX.Element {
           case 'ready':
             setBackend(m.backend);
             setModelLabel(m.model);
-            if ((m as any).tier) setTier((m as any).tier);
+            if (m.tier) setTier(m.tier);
+            if (m.available_tiers?.length) setAvailableTiers(m.available_tiers);
             return [
               ...prev,
               {
@@ -125,7 +128,7 @@ function ChatUI(props: IChatUIProps): JSX.Element {
 
   const onTierChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
     if (busy) return;
-    const next = e.target.value as 'opus' | 'sonnet' | 'haiku';
+    const next = e.target.value as Tier;
     setTier(next);
     props.client.setTier(next);
     setMessages(prev => [
@@ -149,7 +152,7 @@ function ChatUI(props: IChatUIProps): JSX.Element {
               : 'Tier switching is only available on the Bedrock backend'
           }
         >
-          {TIERS.map(t => (
+          {availableTiers.map(t => (
             <option key={t} value={t}>
               {t}
             </option>

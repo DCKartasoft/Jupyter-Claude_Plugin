@@ -50,11 +50,7 @@ def build_options(
         env["ANTHROPIC_DEFAULT_SONNET_MODEL"] = cfg.default_sonnet_model
         env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] = cfg.default_haiku_model
 
-        tier_map = {
-            "opus": cfg.default_opus_model,
-            "sonnet": cfg.default_sonnet_model,
-            "haiku": cfg.default_haiku_model,
-        }
+        tier_map = cfg.tier_models()
         selected_tier = tier_override or cfg.main_model_tier
         env["ANTHROPIC_MODEL"] = tier_map[selected_tier]
 

@@ -32,10 +32,14 @@ export interface IResultMessage {
   usage: unknown;
 }
 
+export type Tier = 'fable' | 'opus' | 'sonnet' | 'haiku';
+
 export interface IReadyMessage {
   type: 'ready';
   backend: string;
   model: string;
+  tier?: Tier;
+  available_tiers?: Tier[];
 }
 
 export interface IErrorMessage {
@@ -60,7 +64,7 @@ export interface IUserMessagePayload {
 
 export interface ISetTierPayload {
   type: 'set_tier';
-  tier: 'opus' | 'sonnet' | 'haiku';
+  tier: Tier;
 }
 
 export interface IMcpReloadPayload {
@@ -129,7 +133,7 @@ export class ChatClient {
     this._sendRaw(msg);
   }
 
-  setTier(tier: 'opus' | 'sonnet' | 'haiku'): void {
+  setTier(tier: Tier): void {
     const msg: ClientMessage = { type: 'set_tier', tier };
     this._sendRaw(msg);
   }

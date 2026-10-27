@@ -209,9 +209,12 @@ If your Bedrock region uses different inference profile IDs than the defaults, o
   "opus": "us.anthropic.claude-opus-5-5",
   "sonnet": "us.anthropic.claude-sonnet-5-5",
   "haiku": "us.anthropic.claude-haiku-5-5",
-  "aws_region": "us-east-1"
+  "aws_region": "us-east-1",
+  "tiers": ["opus", "sonnet", "haiku"]
 }
 ```
+
+`tiers` limits which tiers appear in the panel's model picker (and which the server accepts). Valid names: `fable`, `opus`, `sonnet`, `haiku`; default is `opus, sonnet, haiku` (`fable` is opt-in). Remove a tier to hide a model that isn't available in your region or account.
 
 `aws_region` sets the Bedrock region (default `us-east-1`). For data-sovereignty requirements, set it together with inference-profile IDs whose prefix matches the geography (e.g. `eu.anthropic...` with an EU region) so inference stays in the intended region.
 

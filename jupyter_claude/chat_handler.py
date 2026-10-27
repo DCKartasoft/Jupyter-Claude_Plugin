@@ -122,17 +122,13 @@ class ChatWebSocketHandler(JupyterHandler, WebSocketHandler):
             "backend": cfg.backend,
             "model": model_id,
             "tier": self._tier,
+            "available_tiers": cfg.allowed_tiers(),
         })
 
     def _resolve_model_id(self, cfg) -> str:
         if cfg.backend != "bedrock":
             return cfg.model
-        tier_map = {
-            "opus": cfg.default_opus_model,
-            "sonnet": cfg.default_sonnet_model,
-            "haiku": cfg.default_haiku_model,
-        }
-        return tier_map[self._tier]
+        return cfg.tier_models()[self._tier]
 
     async def _stop_client(self):
         if self._client is None:
@@ -169,7 +165,7 @@ class ChatWebSocketHandler(JupyterHandler, WebSocketHandler):
 
         if mtype == "set_tier":
             new_tier = msg.get("tier")
-            if new_tier not in ("opus", "sonnet", "haiku"):
+            if new_tier not in cfg.allowed_tiers():
                 await self._send({"type": "error", "message": f"unknown tier: {new_tier!r}"})
                 return
             if cfg.backend != "bedrock":

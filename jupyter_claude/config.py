@@ -5,6 +5,11 @@ from jupyter_server.extension.application import ExtensionApp
 from traitlets import Bool, Enum, Int, List, Unicode, default
 
 
+ALL_TIERS = ["fable", "opus", "sonnet", "haiku"]
+# Fable is opt-in: it may not be available in every region/account.
+DEFAULT_TIERS = ["opus", "sonnet", "haiku"]
+
+
 class ClaudeExtensionApp(ExtensionApp):
     name = "jupyter_claude"
 
@@ -100,6 +105,18 @@ class ClaudeExtensionApp(ExtensionApp):
         "corresponding default_{tier}_model. On Anthropic direct this is "
         "ignored — use the `model` trait instead.",
     )
+
+    available_tiers = List(
+        Unicode(),
+        config=True,
+        help="Tiers offered in the model picker and accepted by tier switching. "
+        "Subset of fable/opus/sonnet/haiku. Defaults to `tiers` in "
+        "jupyter_claude_models.json, else opus/sonnet/haiku.",
+    )
+
+    @default("available_tiers")
+    def _default_available_tiers(self):
+        return self._models_json().get("tiers", DEFAULT_TIERS)
 
     system_prompt = Unicode(
         "You are a helpful assistant collaborating with a data scientist inside "
@@ -207,6 +224,21 @@ class ClaudeExtensionApp(ExtensionApp):
         "stacks in us-east-2).",
     )
 
+    def allowed_tiers(self):
+        """Validated `available_tiers`, in canonical order; falls back to the default."""
+        wanted = self.available_tiers if isinstance(self.available_tiers, list) else []
+        allowed = [t for t in ALL_TIERS if t in wanted]
+        return allowed or list(DEFAULT_TIERS)
+
+    def tier_models(self):
+        """Map tier name -> Bedrock inference-profile ID."""
+        return {
+            "fable": self.default_fable_model,
+            "opus": self.default_opus_model,
+            "sonnet": self.default_sonnet_model,
+            "haiku": self.default_haiku_model,
+        }
+
     def _models_json(self):
         try:
             from jupyter_core.paths import jupyter_config_dir
@@ -237,6 +269,18 @@ class ClaudeExtensionApp(ExtensionApp):
             trait = self._MODELS_JSON_TRAITS.get(key)
             if trait and isinstance(value, str) and value:
                 setattr(self, trait, value)
+        if "tiers" in self._models_json():
+            self.available_tiers = self._models_json()["tiers"]
+        allowed = self.allowed_tiers()
+        if self.main_model_tier not in allowed:
+            # Prefer the balanced/cheap tiers when falling back.
+            fallback = next(t for t in ("sonnet", "haiku", "opus", "fable") if t in allowed)
+            self.log.warning(
+                "jupyter_claude: main_model_tier=%r is not in available tiers %s; "
+                "using %r",
+                self.main_model_tier, allowed, fallback,
+            )
+            self.main_model_tier = fallback
         self.settings["jclaude_config"] = self
         if self.backend == "bedrock":
             self.log.info(
